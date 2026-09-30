@@ -16,6 +16,7 @@
   function layout() {
     var s = fit ? Math.min(window.innerWidth / W, window.innerHeight / H) : 1;
     var x = Math.max(0, (window.innerWidth - W * s) / 2), y = Math.max(0, (window.innerHeight - H * s) / 2);
+    document.body.classList.toggle('has-gutters', x > 2 || y > 2);
     stage.style.transform = 'translate(' + x + 'px, ' + y + 'px) scale(' + s + ')';
   }
   window.addEventListener('resize', layout);
