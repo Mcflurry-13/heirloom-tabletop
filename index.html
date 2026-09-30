@@ -20,7 +20,14 @@
 @font-face { font-family: 'Newsreader'; src: url('assets/fonts/Newsreader.ttf') format('truetype'); font-style: normal; font-weight: 200 800; font-display: swap; }
 @font-face { font-family: 'Newsreader'; src: url('assets/fonts/Newsreader-Italic.ttf') format('truetype'); font-style: italic; font-weight: 200 800; font-display: swap; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: linear-gradient(180deg, #A9A5D2 0%, #BCB6E1 46%, #E6D8EB 100%); touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
-#stage { position: absolute; left: 0; top: 0; width: 1194px; height: 834px; transform-origin: 0 0; }
+#stage { position: absolute; left: 0; top: 0; z-index: 1; width: 1194px; height: 834px; transform-origin: 0 0; }
+@media (min-aspect-ratio: 3/2) {
+  body::before { content: ''; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse 40% 60% at 17% 44%, rgba(244, 239, 255, .5), transparent 100%), radial-gradient(ellipse 65% 70% at 73% 48%, rgba(242, 232, 255, .27), transparent 100%); }
+  body::after { content: ''; position: fixed; inset: 0; z-index: 20; pointer-events: none; background: url('assets/images/grain.jpg') center / 640px repeat; mix-blend-mode: soft-light; opacity: .22; }
+  #stage > div { background: transparent !important; }
+  #stage img[src="assets/images/grain.jpg"] { display: none !important; }
+  #stage > div > div:nth-child(1), #stage > div > div:nth-child(2), #stage > div > div:nth-child(3) { display: none !important; }
+}
 button:focus-visible { outline: 2px solid #5B4FA0; outline-offset: 2px; }
 img { -webkit-user-drag: none; user-select: none; }
 noscript { position: absolute; left: 24px; top: 24px; font: 16px sans-serif; color: #2F2A55; }
