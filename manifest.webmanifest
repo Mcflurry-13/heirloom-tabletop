@@ -1,0 +1,17 @@
+{
+  "name": "Heirloom",
+  "short_name": "Heirloom",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "start_url": "./",
+  "scope": "./",
+  "background_color": "#BCB6E1",
+  "theme_color": "#A9A5D2",
+  "icons": [
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

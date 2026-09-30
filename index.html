@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Heirloom">
+<meta name="theme-color" content="#A9A5D2">
+<meta name="description" content="Heirloom: a Wizard of Oz tabletop prototype for an 11-inch iPad Pro with a ceramic vase standing on the screen.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="assets/icon-512.png">
+<title>Heirloom</title>
+<style>
+@font-face { font-family: 'Caveat'; src: url('assets/fonts/Caveat.ttf') format('truetype'); font-style: normal; font-weight: 400 700; font-display: swap; }
+@font-face { font-family: 'Instrument Sans'; src: url('assets/fonts/InstrumentSans.ttf') format('truetype'); font-style: normal; font-weight: 400 700; font-display: swap; }
+@font-face { font-family: 'Instrument Sans'; src: url('assets/fonts/InstrumentSans-Italic.ttf') format('truetype'); font-style: italic; font-weight: 400 700; font-display: swap; }
+@font-face { font-family: 'Newsreader'; src: url('assets/fonts/Newsreader.ttf') format('truetype'); font-style: normal; font-weight: 200 800; font-display: swap; }
+@font-face { font-family: 'Newsreader'; src: url('assets/fonts/Newsreader-Italic.ttf') format('truetype'); font-style: italic; font-weight: 200 800; font-display: swap; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: linear-gradient(180deg, #A9A5D2 0%, #BCB6E1 46%, #E6D8EB 100%); touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+#stage { position: absolute; left: 0; top: 0; width: 1194px; height: 834px; transform-origin: 0 0; }
+button:focus-visible { outline: 2px solid #5B4FA0; outline-offset: 2px; }
+img { -webkit-user-drag: none; user-select: none; }
+noscript { position: absolute; left: 24px; top: 24px; font: 16px sans-serif; color: #2F2A55; }
+#mode-control { position: fixed; z-index: 50; top: max(14px, env(safe-area-inset-top)); left: max(14px, env(safe-area-inset-left)); font: 13px 'Instrument Sans', sans-serif; color: #2F2A55; }
+#mode-switch { display: flex; gap: 3px; padding: 4px; border: 1px solid rgba(255,255,255,.7); border-radius: 22px; background: rgba(250,247,255,.78); box-shadow: 0 6px 20px rgba(47,42,85,.14); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+#mode-switch button { min-height: 38px; padding: 0 13px; border: 0; border-radius: 18px; color: #4E4880; background: transparent; font: inherit; cursor: pointer; }
+#mode-switch button[aria-pressed="true"] { background: #5B4FA0; color: white; }
+#api-panel { display: none; width: min(330px, calc(100vw - 28px)); box-sizing: border-box; margin-top: 8px; padding: 14px; border-radius: 18px; background: rgba(250,247,255,.95); box-shadow: 0 8px 30px rgba(47,42,85,.17); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+#api-panel.is-open { display: block; }
+#api-panel label { display: block; margin-bottom: 7px; font-weight: 600; }
+#api-story { display: block; width: 100%; height: 80px; box-sizing: border-box; resize: vertical; border: 1px solid #c9c3e2; border-radius: 10px; padding: 9px; background: white; color: #2F2A55; font: 14px/1.4 'Instrument Sans', sans-serif; user-select: text; -webkit-user-select: text; touch-action: auto; }
+#api-actions { display: flex; gap: 6px; margin-top: 9px; }
+#api-actions button { flex: 1; min-height: 38px; border: 1px solid #aaa0d3; border-radius: 18px; background: white; color: #4E4880; font: inherit; cursor: pointer; }
+#api-actions button.primary { background: #5B4FA0; color: white; border-color: #5B4FA0; }
+#api-actions button:disabled { opacity: .45; cursor: default; }
+#api-status { min-height: 34px; margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: #4E4880; }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="mode-control" aria-label="Prototype mode">
+  <div id="mode-switch"><button type="button" id="wizard-mode" aria-pressed="true">Wizard of Oz</button><button type="button" id="api-mode" aria-pressed="false">AI / API</button></div>
+  <div id="api-panel"><label for="api-story">Family story</label><textarea id="api-story">今天是中秋节，我们自己做了月饼。你在美国怎么样？有没有吃月饼呀？我们想你啦！</textarea><div id="api-actions"><button type="button" id="api-record">Record voice</button><button type="button" class="primary" id="api-generate">Generate</button></div><p id="api-status" role="status" aria-live="polite">Type a memory or record a voice, then generate.</p></div>
+</div>
+<noscript>Heirloom needs JavaScript to run.</noscript>
+<template id="heirloom-template">
+<div style="position: relative; width: 1194px; height: 834px; overflow: hidden; background: linear-gradient(180deg, #A9A5D2 0%, #BCB6E1 46%, #E6D8EB 100%); color: #2F2A55; font-family: 'Instrument Sans', 'Helvetica Neue', Helvetica, sans-serif">
+<div style="position: absolute; left: 260px; top: -520px; width: 1200px; height: 1200px; border-radius: 600px; pointer-events: none; background: radial-gradient(closest-side, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.1) 55%, rgba(255, 255, 255, 0) 100%)"></div>
+<div style="position: absolute; left: 760px; top: 117px; width: 600px; height: 600px; border-radius: 300px; pointer-events: none; mix-blend-mode: screen; background: radial-gradient(closest-side, {{glow2.c1}}, {{glow2.c2}} 40%, rgba(255, 255, 255, 0) 100%); opacity: {{glow2.o}}"></div>
+<div style="position: absolute; left: -120px; top: 57px; width: 720px; height: 720px; border-radius: 360px; pointer-events: none; mix-blend-mode: screen; background: radial-gradient(closest-side, {{halo.c1}}, {{halo.c2}} 36%, rgba(255, 255, 255, 0) 100%); opacity: {{halo.o}}"></div>
+<div style="position: absolute; left: 40px; top: 217px; width: 400px; height: 400px; border-radius: 200px; pointer-events: none; mix-blend-mode: screen; background: radial-gradient(closest-side, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.55) 26%, rgba(240, 234, 255, 0.2) 58%, rgba(255, 255, 255, 0) 100%); opacity: {{vg.o}}"></div>
+<svg width="1194" height="834" viewBox="0 0 1194 834" style="position: absolute; left: 0; top: 0; pointer-events: none; opacity: {{dots.o}}" aria-hidden="true">
+<circle cx="115.4" cy="191.8" r="{{dots.r0}}" style="fill: #FFFFFF"></circle>
+<circle cx="102.2" cy="213.0" r="{{dots.r1}}" style="fill: #FFFFFF"></circle>
+<circle cx="88.9" cy="234.2" r="{{dots.r2}}" style="fill: #FFFFFF"></circle>
+<circle cx="149.9" cy="183.8" r="{{dots.r3}}" style="fill: #FFFFFF"></circle>
+<circle cx="136.6" cy="205.0" r="{{dots.r4}}" style="fill: #FFFFFF"></circle>
+<circle cx="123.4" cy="226.2" r="{{dots.r5}}" style="fill: #FFFFFF"></circle>
+<circle cx="110.1" cy="247.4" r="{{dots.r6}}" style="fill: #FFFFFF"></circle>
+<circle cx="96.9" cy="268.6" r="{{dots.r7}}" style="fill: #FFFFFF"></circle>
+<circle cx="83.6" cy="289.8" r="{{dots.r8}}" style="fill: #FFFFFF"></circle>
+<circle cx="184.3" cy="175.9" r="{{dots.r9}}" style="fill: #FFFFFF"></circle>
+<circle cx="171.1" cy="197.1" r="{{dots.r10}}" style="fill: #FFFFFF"></circle>
+<circle cx="157.8" cy="218.3" r="{{dots.r11}}" style="fill: #FFFFFF"></circle>
+<circle cx="144.6" cy="239.5" r="{{dots.r12}}" style="fill: #FFFFFF"></circle>
+<circle cx="131.3" cy="260.7" r="{{dots.r13}}" style="fill: #FFFFFF"></circle>
+<circle cx="118.1" cy="281.9" r="{{dots.r14}}" style="fill: #FFFFFF"></circle>
+<circle cx="104.8" cy="303.1" r="{{dots.r15}}" style="fill: #FFFFFF"></circle>
+<circle cx="91.6" cy="324.3" r="{{dots.r16}}" style="fill: #FFFFFF"></circle>
+<circle cx="78.3" cy="345.5" r="{{dots.r17}}" style="fill: #FFFFFF"></circle>
+<circle cx="218.8" cy="167.9" r="{{dots.r18}}" style="fill: #FFFFFF"></circle>
+<circle cx="205.5" cy="189.1" r="{{dots.r19}}" style="fill: #FFFFFF"></circle>
+<circle cx="192.3" cy="210.3" r="{{dots.r20}}" style="fill: #FFFFFF"></circle>
+<circle cx="179.0" cy="231.5" r="{{dots.r21}}" style="fill: #FFFFFF"></circle>
+<circle cx="165.8" cy="252.7" r="{{dots.r22}}" style="fill: #FFFFFF"></circle>
+<circle cx="152.5" cy="273.9" r="{{dots.r23}}" style="fill: #FFFFFF"></circle>
+<circle cx="139.3" cy="295.1" r="{{dots.r24}}" style="fill: #FFFFFF"></circle>
+<circle cx="126.0" cy="316.3" r="{{dots.r25}}" style="fill: #FFFFFF"></circle>
+<circle cx="112.8" cy="337.5" r="{{dots.r26}}" style="fill: #FFFFFF"></circle>
+<circle cx="99.5" cy="358.7" r="{{dots.r27}}" style="fill: #FFFFFF"></circle>
+<circle cx="86.3" cy="379.9" r="{{dots.r28}}" style="fill: #FFFFFF"></circle>
+<circle cx="253.2" cy="159.9" r="{{dots.r29}}" style="fill: #FFFFFF"></circle>
+<circle cx="240.0" cy="181.2" r="{{dots.r30}}" style="fill: #FFFFFF"></circle>
+<circle cx="226.7" cy="202.4" r="{{dots.r31}}" style="fill: #FFFFFF"></circle>
+<circle cx="213.5" cy="223.6" r="{{dots.r32}}" style="fill: #FFFFFF"></circle>
+<circle cx="200.2" cy="244.8" r="{{dots.r33}}" style="fill: #FFFFFF"></circle>
+<circle cx="187.0" cy="266.0" r="{{dots.r34}}" style="fill: #FFFFFF"></circle>
+<circle cx="173.7" cy="287.2" r="{{dots.r35}}" style="fill: #FFFFFF"></circle>
+<circle cx="160.5" cy="308.4" r="{{dots.r36}}" style="fill: #FFFFFF"></circle>
+<circle cx="147.2" cy="329.6" r="{{dots.r37}}" style="fill: #FFFFFF"></circle>
+<circle cx="120.7" cy="372.0" r="{{dots.r38}}" style="fill: #FFFFFF"></circle>
+<circle cx="107.5" cy="393.2" r="{{dots.r39}}" style="fill: #FFFFFF"></circle>
+<circle cx="94.3" cy="414.4" r="{{dots.r40}}" style="fill: #FFFFFF"></circle>
+<circle cx="81.0" cy="435.6" r="{{dots.r41}}" style="fill: #FFFFFF"></circle>
+<circle cx="274.4" cy="173.2" r="{{dots.r42}}" style="fill: #FFFFFF"></circle>
+<circle cx="261.2" cy="194.4" r="{{dots.r43}}" style="fill: #FFFFFF"></circle>
+<circle cx="247.9" cy="215.6" r="{{dots.r44}}" style="fill: #FFFFFF"></circle>
+<circle cx="234.7" cy="236.8" r="{{dots.r45}}" style="fill: #FFFFFF"></circle>
+<circle cx="221.4" cy="258.0" r="{{dots.r46}}" style="fill: #FFFFFF"></circle>
+<circle cx="208.2" cy="279.2" r="{{dots.r47}}" style="fill: #FFFFFF"></circle>
+<circle cx="102.2" cy="448.8" r="{{dots.r48}}" style="fill: #FFFFFF"></circle>
+<circle cx="89.0" cy="470.0" r="{{dots.r49}}" style="fill: #FFFFFF"></circle>
+<circle cx="308.9" cy="165.2" r="{{dots.r50}}" style="fill: #FFFFFF"></circle>
+<circle cx="295.6" cy="186.4" r="{{dots.r51}}" style="fill: #FFFFFF"></circle>
+<circle cx="282.4" cy="207.6" r="{{dots.r52}}" style="fill: #FFFFFF"></circle>
+<circle cx="269.1" cy="228.8" r="{{dots.r53}}" style="fill: #FFFFFF"></circle>
+<circle cx="255.9" cy="250.0" r="{{dots.r54}}" style="fill: #FFFFFF"></circle>
+<circle cx="242.6" cy="271.3" r="{{dots.r55}}" style="fill: #FFFFFF"></circle>
+<circle cx="110.2" cy="483.3" r="{{dots.r56}}" style="fill: #FFFFFF"></circle>
+<circle cx="96.9" cy="504.5" r="{{dots.r57}}" style="fill: #FFFFFF"></circle>
+<circle cx="83.7" cy="525.7" r="{{dots.r58}}" style="fill: #FFFFFF"></circle>
+<circle cx="330.1" cy="178.5" r="{{dots.r59}}" style="fill: #FFFFFF"></circle>
+<circle cx="316.8" cy="199.7" r="{{dots.r60}}" style="fill: #FFFFFF"></circle>
+<circle cx="303.6" cy="220.9" r="{{dots.r61}}" style="fill: #FFFFFF"></circle>
+<circle cx="290.3" cy="242.1" r="{{dots.r62}}" style="fill: #FFFFFF"></circle>
+<circle cx="277.1" cy="263.3" r="{{dots.r63}}" style="fill: #FFFFFF"></circle>
+<circle cx="263.8" cy="284.5" r="{{dots.r64}}" style="fill: #FFFFFF"></circle>
+<circle cx="131.4" cy="496.5" r="{{dots.r65}}" style="fill: #FFFFFF"></circle>
+<circle cx="118.1" cy="517.7" r="{{dots.r66}}" style="fill: #FFFFFF"></circle>
+<circle cx="104.9" cy="538.9" r="{{dots.r67}}" style="fill: #FFFFFF"></circle>
+<circle cx="91.6" cy="560.1" r="{{dots.r68}}" style="fill: #FFFFFF"></circle>
+<circle cx="78.4" cy="581.3" r="{{dots.r69}}" style="fill: #FFFFFF"></circle>
+<circle cx="351.3" cy="191.7" r="{{dots.r70}}" style="fill: #FFFFFF"></circle>
+<circle cx="338.0" cy="212.9" r="{{dots.r71}}" style="fill: #FFFFFF"></circle>
+<circle cx="324.8" cy="234.1" r="{{dots.r72}}" style="fill: #FFFFFF"></circle>
+<circle cx="311.5" cy="255.3" r="{{dots.r73}}" style="fill: #FFFFFF"></circle>
+<circle cx="298.3" cy="276.5" r="{{dots.r74}}" style="fill: #FFFFFF"></circle>
+<circle cx="285.0" cy="297.7" r="{{dots.r75}}" style="fill: #FFFFFF"></circle>
+<circle cx="152.6" cy="509.8" r="{{dots.r76}}" style="fill: #FFFFFF"></circle>
+<circle cx="139.3" cy="531.0" r="{{dots.r77}}" style="fill: #FFFFFF"></circle>
+<circle cx="126.1" cy="552.2" r="{{dots.r78}}" style="fill: #FFFFFF"></circle>
+<circle cx="112.8" cy="573.4" r="{{dots.r79}}" style="fill: #FFFFFF"></circle>
+<circle cx="99.6" cy="594.6" r="{{dots.r80}}" style="fill: #FFFFFF"></circle>
+<circle cx="86.3" cy="615.8" r="{{dots.r81}}" style="fill: #FFFFFF"></circle>
+<circle cx="372.5" cy="205.0" r="{{dots.r82}}" style="fill: #FFFFFF"></circle>
+<circle cx="359.2" cy="226.2" r="{{dots.r83}}" style="fill: #FFFFFF"></circle>
+<circle cx="346.0" cy="247.4" r="{{dots.r84}}" style="fill: #FFFFFF"></circle>
+<circle cx="332.7" cy="268.6" r="{{dots.r85}}" style="fill: #FFFFFF"></circle>
+<circle cx="319.5" cy="289.8" r="{{dots.r86}}" style="fill: #FFFFFF"></circle>
+<circle cx="160.5" cy="544.2" r="{{dots.r87}}" style="fill: #FFFFFF"></circle>
+<circle cx="147.3" cy="565.4" r="{{dots.r88}}" style="fill: #FFFFFF"></circle>
+<circle cx="134.0" cy="586.6" r="{{dots.r89}}" style="fill: #FFFFFF"></circle>
+<circle cx="120.8" cy="607.8" r="{{dots.r90}}" style="fill: #FFFFFF"></circle>
+<circle cx="107.5" cy="629.0" r="{{dots.r91}}" style="fill: #FFFFFF"></circle>
+<circle cx="393.7" cy="218.2" r="{{dots.r92}}" style="fill: #FFFFFF"></circle>
+<circle cx="380.4" cy="239.4" r="{{dots.r93}}" style="fill: #FFFFFF"></circle>
+<circle cx="367.2" cy="260.6" r="{{dots.r94}}" style="fill: #FFFFFF"></circle>
+<circle cx="353.9" cy="281.8" r="{{dots.r95}}" style="fill: #FFFFFF"></circle>
+<circle cx="340.7" cy="303.0" r="{{dots.r96}}" style="fill: #FFFFFF"></circle>
+<circle cx="327.4" cy="324.2" r="{{dots.r97}}" style="fill: #FFFFFF"></circle>
+<circle cx="195.0" cy="536.3" r="{{dots.r98}}" style="fill: #FFFFFF"></circle>
+<circle cx="181.7" cy="557.5" r="{{dots.r99}}" style="fill: #FFFFFF"></circle>
+<circle cx="168.5" cy="578.7" r="{{dots.r100}}" style="fill: #FFFFFF"></circle>
+<circle cx="155.2" cy="599.9" r="{{dots.r101}}" style="fill: #FFFFFF"></circle>
+<circle cx="142.0" cy="621.1" r="{{dots.r102}}" style="fill: #FFFFFF"></circle>
+<circle cx="128.7" cy="642.3" r="{{dots.r103}}" style="fill: #FFFFFF"></circle>
+<circle cx="414.9" cy="231.5" r="{{dots.r104}}" style="fill: #FFFFFF"></circle>
+<circle cx="401.6" cy="252.7" r="{{dots.r105}}" style="fill: #FFFFFF"></circle>
+<circle cx="388.4" cy="273.9" r="{{dots.r106}}" style="fill: #FFFFFF"></circle>
+<circle cx="375.1" cy="295.1" r="{{dots.r107}}" style="fill: #FFFFFF"></circle>
+<circle cx="361.9" cy="316.3" r="{{dots.r108}}" style="fill: #FFFFFF"></circle>
+<circle cx="348.6" cy="337.5" r="{{dots.r109}}" style="fill: #FFFFFF"></circle>
+<circle cx="216.2" cy="549.5" r="{{dots.r110}}" style="fill: #FFFFFF"></circle>
+<circle cx="202.9" cy="570.7" r="{{dots.r111}}" style="fill: #FFFFFF"></circle>
+<circle cx="189.7" cy="591.9" r="{{dots.r112}}" style="fill: #FFFFFF"></circle>
+<circle cx="176.4" cy="613.1" r="{{dots.r113}}" style="fill: #FFFFFF"></circle>
+<circle cx="163.2" cy="634.3" r="{{dots.r114}}" style="fill: #FFFFFF"></circle>
+<circle cx="149.9" cy="655.5" r="{{dots.r115}}" style="fill: #FFFFFF"></circle>
+<circle cx="436.1" cy="244.7" r="{{dots.r116}}" style="fill: #FFFFFF"></circle>
+<circle cx="422.8" cy="265.9" r="{{dots.r117}}" style="fill: #FFFFFF"></circle>
+<circle cx="409.6" cy="287.1" r="{{dots.r118}}" style="fill: #FFFFFF"></circle>
+<circle cx="396.3" cy="308.3" r="{{dots.r119}}" style="fill: #FFFFFF"></circle>
+<circle cx="383.1" cy="329.5" r="{{dots.r120}}" style="fill: #FFFFFF"></circle>
+<circle cx="369.8" cy="350.7" r="{{dots.r121}}" style="fill: #FFFFFF"></circle>
+<circle cx="237.4" cy="562.7" r="{{dots.r122}}" style="fill: #FFFFFF"></circle>
+<circle cx="224.1" cy="584.0" r="{{dots.r123}}" style="fill: #FFFFFF"></circle>
+<circle cx="210.9" cy="605.2" r="{{dots.r124}}" style="fill: #FFFFFF"></circle>
+<circle cx="197.6" cy="626.4" r="{{dots.r125}}" style="fill: #FFFFFF"></circle>
+<circle cx="184.4" cy="647.6" r="{{dots.r126}}" style="fill: #FFFFFF"></circle>
+<circle cx="171.1" cy="668.8" r="{{dots.r127}}" style="fill: #FFFFFF"></circle>
+<circle cx="444.0" cy="279.2" r="{{dots.r128}}" style="fill: #FFFFFF"></circle>
+<circle cx="430.8" cy="300.4" r="{{dots.r129}}" style="fill: #FFFFFF"></circle>
+<circle cx="417.5" cy="321.6" r="{{dots.r130}}" style="fill: #FFFFFF"></circle>
+<circle cx="404.3" cy="342.8" r="{{dots.r131}}" style="fill: #FFFFFF"></circle>
+<circle cx="391.0" cy="364.0" r="{{dots.r132}}" style="fill: #FFFFFF"></circle>
+<circle cx="377.8" cy="385.2" r="{{dots.r133}}" style="fill: #FFFFFF"></circle>
+<circle cx="271.8" cy="554.8" r="{{dots.r134}}" style="fill: #FFFFFF"></circle>
+<circle cx="258.6" cy="576.0" r="{{dots.r135}}" style="fill: #FFFFFF"></circle>
+<circle cx="245.3" cy="597.2" r="{{dots.r136}}" style="fill: #FFFFFF"></circle>
+<circle cx="232.1" cy="618.4" r="{{dots.r137}}" style="fill: #FFFFFF"></circle>
+<circle cx="218.8" cy="639.6" r="{{dots.r138}}" style="fill: #FFFFFF"></circle>
+<circle cx="205.6" cy="660.8" r="{{dots.r139}}" style="fill: #FFFFFF"></circle>
+<circle cx="465.2" cy="292.4" r="{{dots.r140}}" style="fill: #FFFFFF"></circle>
+<circle cx="452.0" cy="313.6" r="{{dots.r141}}" style="fill: #FFFFFF"></circle>
+<circle cx="438.7" cy="334.8" r="{{dots.r142}}" style="fill: #FFFFFF"></circle>
+<circle cx="425.5" cy="356.0" r="{{dots.r143}}" style="fill: #FFFFFF"></circle>
+<circle cx="412.2" cy="377.2" r="{{dots.r144}}" style="fill: #FFFFFF"></circle>
+<circle cx="399.0" cy="398.4" r="{{dots.r145}}" style="fill: #FFFFFF"></circle>
+<circle cx="385.7" cy="419.6" r="{{dots.r146}}" style="fill: #FFFFFF"></circle>
+<circle cx="372.5" cy="440.8" r="{{dots.r147}}" style="fill: #FFFFFF"></circle>
+<circle cx="359.3" cy="462.0" r="{{dots.r148}}" style="fill: #FFFFFF"></circle>
+<circle cx="332.8" cy="504.4" r="{{dots.r149}}" style="fill: #FFFFFF"></circle>
+<circle cx="319.5" cy="525.6" r="{{dots.r150}}" style="fill: #FFFFFF"></circle>
+<circle cx="306.3" cy="546.8" r="{{dots.r151}}" style="fill: #FFFFFF"></circle>
+<circle cx="293.0" cy="568.0" r="{{dots.r152}}" style="fill: #FFFFFF"></circle>
+<circle cx="279.8" cy="589.2" r="{{dots.r153}}" style="fill: #FFFFFF"></circle>
+<circle cx="266.5" cy="610.4" r="{{dots.r154}}" style="fill: #FFFFFF"></circle>
+<circle cx="253.3" cy="631.6" r="{{dots.r155}}" style="fill: #FFFFFF"></circle>
+<circle cx="240.0" cy="652.8" r="{{dots.r156}}" style="fill: #FFFFFF"></circle>
+<circle cx="226.8" cy="674.1" r="{{dots.r157}}" style="fill: #FFFFFF"></circle>
+<circle cx="473.2" cy="326.9" r="{{dots.r158}}" style="fill: #FFFFFF"></circle>
+<circle cx="459.9" cy="348.1" r="{{dots.r159}}" style="fill: #FFFFFF"></circle>
+<circle cx="446.7" cy="369.3" r="{{dots.r160}}" style="fill: #FFFFFF"></circle>
+<circle cx="433.4" cy="390.5" r="{{dots.r161}}" style="fill: #FFFFFF"></circle>
+<circle cx="420.2" cy="411.7" r="{{dots.r162}}" style="fill: #FFFFFF"></circle>
+<circle cx="407.0" cy="432.9" r="{{dots.r163}}" style="fill: #FFFFFF"></circle>
+<circle cx="393.7" cy="454.1" r="{{dots.r164}}" style="fill: #FFFFFF"></circle>
+<circle cx="380.5" cy="475.3" r="{{dots.r165}}" style="fill: #FFFFFF"></circle>
+<circle cx="367.2" cy="496.5" r="{{dots.r166}}" style="fill: #FFFFFF"></circle>
+<circle cx="354.0" cy="517.7" r="{{dots.r167}}" style="fill: #FFFFFF"></circle>
+<circle cx="340.7" cy="538.9" r="{{dots.r168}}" style="fill: #FFFFFF"></circle>
+<circle cx="327.5" cy="560.1" r="{{dots.r169}}" style="fill: #FFFFFF"></circle>
+<circle cx="314.2" cy="581.3" r="{{dots.r170}}" style="fill: #FFFFFF"></circle>
+<circle cx="301.0" cy="602.5" r="{{dots.r171}}" style="fill: #FFFFFF"></circle>
+<circle cx="287.7" cy="623.7" r="{{dots.r172}}" style="fill: #FFFFFF"></circle>
+<circle cx="274.5" cy="644.9" r="{{dots.r173}}" style="fill: #FFFFFF"></circle>
+<circle cx="261.2" cy="666.1" r="{{dots.r174}}" style="fill: #FFFFFF"></circle>
+<circle cx="481.1" cy="361.3" r="{{dots.r175}}" style="fill: #FFFFFF"></circle>
+<circle cx="467.9" cy="382.5" r="{{dots.r176}}" style="fill: #FFFFFF"></circle>
+<circle cx="454.6" cy="403.7" r="{{dots.r177}}" style="fill: #FFFFFF"></circle>
+<circle cx="441.4" cy="424.9" r="{{dots.r178}}" style="fill: #FFFFFF"></circle>
+<circle cx="428.2" cy="446.1" r="{{dots.r179}}" style="fill: #FFFFFF"></circle>
+<circle cx="414.9" cy="467.3" r="{{dots.r180}}" style="fill: #FFFFFF"></circle>
+<circle cx="401.7" cy="488.5" r="{{dots.r181}}" style="fill: #FFFFFF"></circle>
+<circle cx="388.4" cy="509.7" r="{{dots.r182}}" style="fill: #FFFFFF"></circle>
+<circle cx="375.2" cy="530.9" r="{{dots.r183}}" style="fill: #FFFFFF"></circle>
+<circle cx="361.9" cy="552.1" r="{{dots.r184}}" style="fill: #FFFFFF"></circle>
+<circle cx="348.7" cy="573.3" r="{{dots.r185}}" style="fill: #FFFFFF"></circle>
+<circle cx="335.4" cy="594.5" r="{{dots.r186}}" style="fill: #FFFFFF"></circle>
+<circle cx="322.2" cy="615.7" r="{{dots.r187}}" style="fill: #FFFFFF"></circle>
+<circle cx="308.9" cy="636.9" r="{{dots.r188}}" style="fill: #FFFFFF"></circle>
+<circle cx="295.7" cy="658.1" r="{{dots.r189}}" style="fill: #FFFFFF"></circle>
+<circle cx="489.1" cy="395.8" r="{{dots.r190}}" style="fill: #FFFFFF"></circle>
+<circle cx="475.8" cy="417.0" r="{{dots.r191}}" style="fill: #FFFFFF"></circle>
+<circle cx="462.6" cy="438.2" r="{{dots.r192}}" style="fill: #FFFFFF"></circle>
+<circle cx="449.4" cy="459.4" r="{{dots.r193}}" style="fill: #FFFFFF"></circle>
+<circle cx="436.1" cy="480.6" r="{{dots.r194}}" style="fill: #FFFFFF"></circle>
+<circle cx="422.9" cy="501.8" r="{{dots.r195}}" style="fill: #FFFFFF"></circle>
+<circle cx="409.6" cy="523.0" r="{{dots.r196}}" style="fill: #FFFFFF"></circle>
+<circle cx="396.4" cy="544.2" r="{{dots.r197}}" style="fill: #FFFFFF"></circle>
+<circle cx="383.1" cy="565.4" r="{{dots.r198}}" style="fill: #FFFFFF"></circle>
+<circle cx="369.9" cy="586.6" r="{{dots.r199}}" style="fill: #FFFFFF"></circle>
+<circle cx="356.6" cy="607.8" r="{{dots.r200}}" style="fill: #FFFFFF"></circle>
+<circle cx="343.4" cy="629.0" r="{{dots.r201}}" style="fill: #FFFFFF"></circle>
+<circle cx="330.1" cy="650.2" r="{{dots.r202}}" style="fill: #FFFFFF"></circle>
+<circle cx="497.1" cy="430.2" r="{{dots.r203}}" style="fill: #FFFFFF"></circle>
+<circle cx="483.8" cy="451.4" r="{{dots.r204}}" style="fill: #FFFFFF"></circle>
+<circle cx="470.6" cy="472.6" r="{{dots.r205}}" style="fill: #FFFFFF"></circle>
+<circle cx="457.3" cy="493.8" r="{{dots.r206}}" style="fill: #FFFFFF"></circle>
+<circle cx="444.1" cy="515.0" r="{{dots.r207}}" style="fill: #FFFFFF"></circle>
+<circle cx="430.8" cy="536.2" r="{{dots.r208}}" style="fill: #FFFFFF"></circle>
+<circle cx="417.6" cy="557.4" r="{{dots.r209}}" style="fill: #FFFFFF"></circle>
+<circle cx="404.3" cy="578.6" r="{{dots.r210}}" style="fill: #FFFFFF"></circle>
+<circle cx="391.1" cy="599.8" r="{{dots.r211}}" style="fill: #FFFFFF"></circle>
+<circle cx="377.8" cy="621.0" r="{{dots.r212}}" style="fill: #FFFFFF"></circle>
+<circle cx="364.6" cy="642.2" r="{{dots.r213}}" style="fill: #FFFFFF"></circle>
+<circle cx="491.8" cy="485.9" r="{{dots.r214}}" style="fill: #FFFFFF"></circle>
+<circle cx="478.5" cy="507.1" r="{{dots.r215}}" style="fill: #FFFFFF"></circle>
+<circle cx="465.3" cy="528.3" r="{{dots.r216}}" style="fill: #FFFFFF"></circle>
+<circle cx="452.0" cy="549.5" r="{{dots.r217}}" style="fill: #FFFFFF"></circle>
+<circle cx="438.8" cy="570.7" r="{{dots.r218}}" style="fill: #FFFFFF"></circle>
+<circle cx="425.5" cy="591.9" r="{{dots.r219}}" style="fill: #FFFFFF"></circle>
+<circle cx="412.3" cy="613.1" r="{{dots.r220}}" style="fill: #FFFFFF"></circle>
+</svg>
+<svg width="1194" height="834" viewBox="0 0 1194 834" style="position: absolute; left: 0; top: 0; pointer-events: none; filter: blur(1px)" aria-hidden="true"><circle cx="240" cy="417" r="150" transform="rotate(-90 240 417)" style="fill: none; stroke: {{arc.c}}; stroke-width: 2; stroke-linecap: round; stroke-dasharray: {{arc.a}}px 2000px; opacity: {{arc.o}}"></circle></svg>
+<div style="position: absolute; left: {{rn.x0}}px; top: {{rn.y0}}px; width: {{rn.s0}}px; height: {{rn.s0}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b0}}; opacity: {{rn.o0}}"></div>
+<div style="position: absolute; left: {{rn.x1}}px; top: {{rn.y1}}px; width: {{rn.s1}}px; height: {{rn.s1}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b1}}; opacity: {{rn.o1}}"></div>
+<div style="position: absolute; left: {{rn.x2}}px; top: {{rn.y2}}px; width: {{rn.s2}}px; height: {{rn.s2}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b2}}; opacity: {{rn.o2}}"></div>
+<div style="position: absolute; left: {{rn.x3}}px; top: {{rn.y3}}px; width: {{rn.s3}}px; height: {{rn.s3}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b3}}; opacity: {{rn.o3}}"></div>
+<div style="position: absolute; left: {{rn.x4}}px; top: {{rn.y4}}px; width: {{rn.s4}}px; height: {{rn.s4}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b4}}; opacity: {{rn.o4}}"></div>
+<div style="position: absolute; left: {{rn.x5}}px; top: {{rn.y5}}px; width: {{rn.s5}}px; height: {{rn.s5}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b5}}; opacity: {{rn.o5}}"></div>
+<div style="position: absolute; left: {{rn.x6}}px; top: {{rn.y6}}px; width: {{rn.s6}}px; height: {{rn.s6}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b6}}; opacity: {{rn.o6}}"></div>
+<div style="position: absolute; left: {{rn.x7}}px; top: {{rn.y7}}px; width: {{rn.s7}}px; height: {{rn.s7}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b7}}; opacity: {{rn.o7}}"></div>
+<div style="position: absolute; left: {{rn.x8}}px; top: {{rn.y8}}px; width: {{rn.s8}}px; height: {{rn.s8}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b8}}; opacity: {{rn.o8}}"></div>
+<div style="position: absolute; left: {{rn.x9}}px; top: {{rn.y9}}px; width: {{rn.s9}}px; height: {{rn.s9}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b9}}; opacity: {{rn.o9}}"></div>
+<div style="position: absolute; left: {{rn.x10}}px; top: {{rn.y10}}px; width: {{rn.s10}}px; height: {{rn.s10}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b10}}; opacity: {{rn.o10}}"></div>
+<div style="position: absolute; left: {{rn.x11}}px; top: {{rn.y11}}px; width: {{rn.s11}}px; height: {{rn.s11}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b11}}; opacity: {{rn.o11}}"></div>
+<div style="position: absolute; left: {{rn.x12}}px; top: {{rn.y12}}px; width: {{rn.s12}}px; height: {{rn.s12}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b12}}; opacity: {{rn.o12}}"></div>
+<div style="position: absolute; left: {{rn.x13}}px; top: {{rn.y13}}px; width: {{rn.s13}}px; height: {{rn.s13}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b13}}; opacity: {{rn.o13}}"></div>
+<div style="position: absolute; left: {{rn.x14}}px; top: {{rn.y14}}px; width: {{rn.s14}}px; height: {{rn.s14}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b14}}; opacity: {{rn.o14}}"></div>
+<div style="position: absolute; left: {{rn.x15}}px; top: {{rn.y15}}px; width: {{rn.s15}}px; height: {{rn.s15}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; background: {{rn.b15}}; opacity: {{rn.o15}}"></div>
+<svg width="1194" height="834" viewBox="0 0 1194 834" style="position: absolute; left: 0; top: 0; pointer-events: none; mix-blend-mode: screen; filter: blur(1.2px)" aria-hidden="true">
+<path d="{{wv.d0}}" style="fill: none; stroke: {{wv.c0}}; stroke-width: {{wv.w0}}px; stroke-linejoin: round; opacity: {{wv.o0}}"></path>
+<path d="{{wv.d1}}" style="fill: none; stroke: {{wv.c1}}; stroke-width: {{wv.w1}}px; stroke-linejoin: round; opacity: {{wv.o1}}"></path>
+<path d="{{wv.d2}}" style="fill: none; stroke: {{wv.c2}}; stroke-width: {{wv.w2}}px; stroke-linejoin: round; opacity: {{wv.o2}}"></path>
+<path d="{{wv.d3}}" style="fill: none; stroke: {{wv.c3}}; stroke-width: {{wv.w3}}px; stroke-linejoin: round; opacity: {{wv.o3}}"></path>
+<path d="{{wv.d4}}" style="fill: none; stroke: {{wv.c4}}; stroke-width: {{wv.w4}}px; stroke-linejoin: round; opacity: {{wv.o4}}"></path>
+<path d="{{wv.d5}}" style="fill: none; stroke: {{wv.c5}}; stroke-width: {{wv.w5}}px; stroke-linejoin: round; opacity: {{wv.o5}}"></path>
+<path d="{{wv.d6}}" style="fill: none; stroke: {{wv.c6}}; stroke-width: {{wv.w6}}px; stroke-linejoin: round; opacity: {{wv.o6}}"></path>
+<path d="{{wv.d7}}" style="fill: none; stroke: {{wv.c7}}; stroke-width: {{wv.w7}}px; stroke-linejoin: round; opacity: {{wv.o7}}"></path>
+<path d="{{wv.d8}}" style="fill: none; stroke: {{wv.c8}}; stroke-width: {{wv.w8}}px; stroke-linejoin: round; opacity: {{wv.o8}}"></path>
+<path d="{{wv.d9}}" style="fill: none; stroke: {{wv.c9}}; stroke-width: {{wv.w9}}px; stroke-linejoin: round; opacity: {{wv.o9}}"></path>
+<path d="{{wv.d10}}" style="fill: none; stroke: {{wv.c10}}; stroke-width: {{wv.w10}}px; stroke-linejoin: round; opacity: {{wv.o10}}"></path>
+<path d="{{wv.d11}}" style="fill: none; stroke: {{wv.c11}}; stroke-width: {{wv.w11}}px; stroke-linejoin: round; opacity: {{wv.o11}}"></path>
+</svg>
+<svg width="600" height="600" viewBox="-130.0 120.0 600 600" style="position: absolute; left: -60px; top: 117px; pointer-events: none; filter: blur(22px); opacity: {{vase.o}}" aria-hidden="true">
+<g transform="rotate({{vase.rot}} 170.0 420.0)">
+<path d="M288.3 420 L288.4 426.2 L288 432.4 L287.2 438.6 L286 444.7 L284.7 450.7 L283 456.7 L281.1 462.6 L278.8 468.5 L276.2 474.1 L273.3 479.6 L270 484.9 L266.5 490.1 L262.9 495.2 L259.1 500.2 L255.3 505.3 L251.3 510.3 L247.2 515.3 L242.8 520.2 L238.1 524.8 L233 529.1 L227.5 532.9 L221.6 536 L215.4 538.2 L208.8 539.6 L202.2 540 L195.4 539.6 L188.7 538.3 L182.2 536.4 L176 533.9 L170 530.9 L164.4 527.7 L159 524.3 L154 520.9 L149.3 517.5 L144.7 514.3 L140.3 511.4 L135.9 508.7 L131.6 506.3 L127.1 504.2 L122.5 502.2 L117.9 500.3 L113.1 498.3 L108.3 496.2 L103.5 493.9 L98.8 491.2 L94.2 488.3 L89.7 485 L85.3 481.5 L81 477.8 L76.6 473.9 L72.3 469.8 L67.9 465.5 L63.5 460.9 L59.3 456 L55.5 450.7 L52.2 445 L49.7 439.1 L48 432.8 L47.4 426.4 L47.8 420 L49 413.7 L50.8 407.5 L53.1 401.5 L55.6 395.7 L58.1 390 L60.5 384.4 L62.8 378.9 L65.2 373.3 L67.6 367.8 L70.4 362.5 L73.6 357.4 L77.2 352.6 L81.3 348.2 L85.6 344 L90.1 340.1 L94.5 336.1 L98.6 331.9 L102.6 327.2 L106.3 321.9 L110 316 L113.8 309.8 L118.2 303.6 L123.2 298.1 L129 293.7 L135.5 291.2 L142.6 291 L149.9 293.3 L157.2 298.1 L164 305.1 L170 313.7 L175.1 323.1 L179.2 332.5 L182.5 341.1 L185.2 348.3 L187.7 353.8 L190.3 357.5 L193.2 359.6 L196.5 360.5 L200.2 360.7 L204.3 360.6 L208.5 360.6 L212.7 361.2 L216.7 362.3 L220.4 364 L224 366 L227.5 368.3 L231.1 370.5 L235.1 372.7 L239.7 374.7 L244.9 376.8 L250.7 378.9 L256.8 381.3 L263.1 384.3 L269.2 387.8 L274.7 391.9 L279.5 396.7 L283.2 402.1 L285.9 407.8 L287.5 413.8Z" style="fill: {{vase.fill.c0}}; opacity: 0.85"></path>
+<path d="M268.1 416.7 L268.1 422.1 L267.7 427.6 L267 432.9 L266 438.3 L264.8 443.6 L263.4 448.8 L261.7 454 L259.7 459 L257.4 464 L254.8 468.8 L252 473.4 L249 478 L245.8 482.4 L242.5 486.8 L239.2 491.2 L235.7 495.6 L232.1 500 L228.3 504.2 L224.1 508.2 L219.6 511.9 L214.8 515.1 L209.6 517.6 L204.1 519.5 L198.4 520.5 L192.6 520.9 L186.7 520.4 L180.9 519.4 L175.3 517.7 L169.9 515.6 L164.7 513.1 L159.8 510.5 L155.1 507.7 L150.7 504.8 L146.5 502.1 L142.5 499.5 L138.6 497.1 L134.7 494.9 L130.8 492.9 L126.8 491.1 L122.7 489.4 L118.5 487.8 L114.3 486 L110.1 484.1 L105.9 482 L101.8 479.6 L97.8 477 L93.8 474.1 L90 471 L86.2 467.7 L82.4 464.2 L78.6 460.6 L74.8 456.7 L71 452.7 L67.5 448.3 L64.2 443.6 L61.5 438.6 L59.5 433.4 L58.3 427.9 L57.9 422.3 L58.3 416.7 L59.4 411.2 L61 405.8 L63 400.6 L65 395.5 L67.1 390.6 L69.1 385.7 L71 380.8 L73 375.9 L75.2 371.1 L77.6 366.5 L80.5 362 L83.7 357.9 L87.2 354 L91 350.4 L94.8 346.9 L98.5 343.3 L102.1 339.4 L105.4 335.2 L108.6 330.4 L111.9 325.3 L115.3 319.9 L119.3 314.7 L123.8 310.1 L129 306.8 L134.7 305 L141 305.3 L147.4 307.7 L153.7 312.1 L159.5 318.3 L164.7 325.6 L169 333.5 L172.6 341.1 L175.6 348 L178.1 353.6 L180.5 357.8 L182.9 360.6 L185.7 362 L188.8 362.6 L192.2 362.7 L195.9 362.7 L199.6 362.9 L203.3 363.6 L206.8 364.8 L210 366.4 L213.2 368.3 L216.3 370.3 L219.6 372.3 L223.2 374.2 L227.3 376 L232 377.9 L237 379.9 L242.4 382.1 L247.7 384.9 L252.8 388.1 L257.4 391.9 L261.2 396.2 L264.2 401 L266.3 406.1 L267.5 411.3Z" style="fill: {{vase.fill.c1}}; opacity: 0.85"></path>
+<path d="M251.2 414.3 L251.2 419 L250.8 423.8 L250.2 428.5 L249.3 433.1 L248.3 437.8 L247.1 442.3 L245.6 446.9 L243.8 451.3 L241.8 455.6 L239.5 459.8 L237.1 463.9 L234.4 467.8 L231.7 471.8 L228.9 475.7 L226 479.5 L222.9 483.4 L219.8 487.2 L216.4 490.9 L212.7 494.3 L208.7 497.4 L204.4 500.1 L199.9 502.2 L195.1 503.7 L190.1 504.6 L185 504.8 L179.9 504.4 L174.9 503.5 L170 502.1 L165.2 500.3 L160.7 498.3 L156.5 496.1 L152.4 493.8 L148.5 491.5 L144.8 489.2 L141.2 487.1 L137.7 485.1 L134.2 483.3 L130.7 481.7 L127.2 480.2 L123.5 478.7 L119.8 477.3 L116.1 475.7 L112.4 474 L108.7 472.1 L105.1 469.9 L101.6 467.5 L98.2 465 L94.8 462.2 L91.5 459.3 L88.2 456.2 L84.8 453 L81.5 449.6 L78.3 445.9 L75.3 442.1 L72.6 437.9 L70.3 433.5 L68.7 428.9 L67.8 424.1 L67.6 419.2 L68.1 414.3 L69 409.5 L70.4 404.8 L72 400.3 L73.7 395.8 L75.4 391.4 L77.1 387.1 L78.7 382.8 L80.4 378.5 L82.3 374.3 L84.5 370.3 L87 366.4 L89.9 362.8 L93 359.4 L96.2 356.2 L99.5 353.1 L102.7 349.9 L105.7 346.4 L108.6 342.5 L111.4 338.3 L114.3 333.8 L117.4 329.2 L120.9 324.8 L125 321.1 L129.6 318.5 L134.8 317.4 L140.3 318 L145.9 320.3 L151.3 324.4 L156.3 329.7 L160.7 336 L164.5 342.4 L167.6 348.7 L170.3 354.1 L172.6 358.5 L174.9 361.6 L177.2 363.6 L179.8 364.6 L182.7 365 L185.8 365 L189.1 365.1 L192.4 365.5 L195.6 366.3 L198.7 367.5 L201.5 369 L204.3 370.7 L207.1 372.5 L210.1 374.3 L213.4 376 L217.1 377.7 L221.2 379.4 L225.7 381.2 L230.2 383.4 L234.8 385.9 L239 388.9 L242.8 392.3 L245.9 396.2 L248.2 400.4 L249.9 404.9 L250.8 409.6Z" style="fill: {{vase.fill.c2}}; opacity: 0.85"></path>
+<path d="M235.5 412.1 L235.4 416.2 L235.1 420.3 L234.5 424.4 L233.8 428.4 L232.9 432.4 L231.9 436.4 L230.6 440.3 L229 444.1 L227.3 447.8 L225.3 451.4 L223.2 455 L220.9 458.4 L218.6 461.8 L216.2 465.2 L213.7 468.6 L211 471.9 L208.3 475.2 L205.3 478.3 L202.1 481.2 L198.6 483.9 L194.9 486.1 L190.9 487.8 L186.7 489.1 L182.4 489.8 L178 489.9 L173.7 489.6 L169.3 488.8 L165.1 487.6 L161.1 486.2 L157.2 484.5 L153.5 482.7 L150 480.9 L146.6 479 L143.4 477.2 L140.2 475.5 L137.1 473.9 L134 472.4 L130.9 471.1 L127.8 469.8 L124.6 468.6 L121.3 467.3 L118.1 465.9 L114.9 464.4 L111.7 462.7 L108.6 460.7 L105.5 458.6 L102.6 456.3 L99.7 453.9 L96.8 451.3 L93.9 448.6 L91 445.8 L88.2 442.8 L85.5 439.7 L82.9 436.2 L80.7 432.6 L78.9 428.8 L77.6 424.7 L77 420.5 L76.9 416.3 L77.3 412.1 L78.2 408 L79.3 403.9 L80.7 400 L82.1 396.1 L83.4 392.3 L84.8 388.6 L86.1 384.8 L87.6 381.1 L89.3 377.5 L91.2 374 L93.4 370.7 L95.9 367.6 L98.5 364.6 L101.3 361.8 L104.1 359.1 L106.8 356.2 L109.4 353.1 L111.8 349.7 L114.2 346 L116.7 342.1 L119.5 338.2 L122.7 334.6 L126.3 331.6 L130.4 329.7 L134.9 329 L139.7 329.8 L144.5 332.1 L149.1 335.6 L153.4 340.2 L157.2 345.3 L160.4 350.6 L163.1 355.5 L165.5 359.8 L167.6 363.1 L169.7 365.4 L171.9 366.8 L174.3 367.5 L176.9 367.7 L179.8 367.8 L182.6 368 L185.5 368.5 L188.3 369.3 L190.9 370.4 L193.4 371.9 L195.9 373.4 L198.4 375 L201.1 376.6 L204 378.1 L207.3 379.6 L210.9 381.1 L214.7 382.8 L218.6 384.8 L222.4 387.1 L225.9 389.8 L228.9 392.9 L231.4 396.4 L233.2 400.1 L234.5 404 L235.2 408Z" style="fill: {{vase.fill.c3}}; opacity: 0.85"></path>
+</g>
+</svg>
+<svg width="600" height="600" viewBox="-130.0 120.0 600 600" style="position: absolute; left: -60px; top: 117px; pointer-events: none; filter: blur(12px); opacity: {{vase.o}}" aria-hidden="true">
+<g transform="rotate({{vase.rot}} 170.0 420.0)">
+<path d="M220.4 410.1 L220.3 413.6 L220.1 417 L219.6 420.5 L219 423.9 L218.3 427.3 L217.3 430.7 L216.2 434 L214.9 437.3 L213.4 440.4 L211.8 443.5 L210 446.5 L208.1 449.4 L206.1 452.4 L204 455.2 L201.9 458.1 L199.7 460.9 L197.3 463.7 L194.7 466.3 L192 468.8 L189 470.9 L185.8 472.8 L182.4 474.2 L178.9 475.2 L175.2 475.7 L171.5 475.8 L167.8 475.5 L164.1 474.9 L160.6 474 L157.2 472.8 L153.9 471.5 L150.7 470.1 L147.7 468.6 L144.8 467.1 L142.1 465.7 L139.3 464.3 L136.7 463.1 L134 461.9 L131.3 460.8 L128.6 459.8 L125.8 458.7 L123 457.6 L120.2 456.4 L117.5 455 L114.7 453.5 L112.1 451.8 L109.5 450 L107 448 L104.6 445.9 L102.1 443.7 L99.7 441.4 L97.2 438.9 L94.8 436.4 L92.6 433.6 L90.5 430.7 L88.7 427.5 L87.3 424.2 L86.3 420.8 L85.8 417.2 L85.8 413.6 L86.2 410.1 L87 406.6 L87.9 403.1 L89 399.8 L90.1 396.5 L91.2 393.3 L92.2 390.1 L93.4 386.9 L94.6 383.7 L96.1 380.6 L97.7 377.6 L99.6 374.8 L101.7 372.2 L104 369.7 L106.3 367.3 L108.7 364.9 L110.9 362.3 L113 359.6 L115.1 356.7 L117.1 353.5 L119.3 350.2 L121.7 347 L124.5 344.1 L127.7 341.8 L131.2 340.4 L135.1 340.1 L139.2 341 L143.3 343 L147.1 346.1 L150.7 349.8 L153.9 354 L156.6 358.2 L158.9 362 L161 365.2 L162.9 367.6 L164.8 369.3 L166.8 370.2 L169 370.7 L171.3 370.9 L173.8 371 L176.3 371.3 L178.7 371.8 L181.1 372.6 L183.4 373.7 L185.5 374.9 L187.6 376.3 L189.8 377.7 L192.2 379.1 L194.8 380.4 L197.6 381.7 L200.7 383.1 L203.9 384.6 L207.1 386.4 L210.2 388.5 L213 390.9 L215.4 393.6 L217.3 396.6 L218.8 399.8 L219.7 403.2 L220.2 406.6Z" style="fill: {{vase.fill.c4}}; opacity: 0.9"></path>
+<path d="M205.9 408.1 L205.8 411 L205.6 413.9 L205.2 416.8 L204.8 419.6 L204.1 422.4 L203.4 425.2 L202.4 428 L201.3 430.7 L200.1 433.3 L198.7 435.8 L197.2 438.3 L195.7 440.8 L194 443.2 L192.4 445.6 L190.6 448 L188.7 450.3 L186.7 452.6 L184.6 454.8 L182.3 456.7 L179.8 458.5 L177.1 459.9 L174.3 461.1 L171.3 461.8 L168.3 462.3 L165.2 462.4 L162.2 462.1 L159.2 461.6 L156.3 460.9 L153.4 460 L150.7 459 L148.1 457.9 L145.6 456.8 L143.2 455.6 L140.9 454.5 L138.6 453.5 L136.3 452.5 L134 451.6 L131.8 450.7 L129.5 449.9 L127.1 449 L124.8 448.1 L122.5 447 L120.2 445.9 L117.9 444.6 L115.7 443.1 L113.6 441.6 L111.5 439.9 L109.5 438.1 L107.4 436.2 L105.4 434.3 L103.4 432.2 L101.5 430.1 L99.6 427.8 L98 425.3 L96.6 422.7 L95.5 419.9 L94.7 417 L94.4 414.1 L94.5 411.1 L94.8 408.1 L95.4 405.2 L96.1 402.4 L97 399.6 L97.8 396.9 L98.7 394.2 L99.5 391.5 L100.5 388.8 L101.5 386.2 L102.7 383.7 L104.1 381.2 L105.7 378.9 L107.4 376.7 L109.3 374.6 L111.2 372.6 L113.1 370.5 L114.9 368.4 L116.7 366.1 L118.4 363.6 L120.1 361 L121.9 358.3 L124 355.7 L126.4 353.4 L129.1 351.7 L132.1 350.8 L135.3 350.7 L138.7 351.6 L142 353.3 L145.2 355.8 L148.1 358.8 L150.7 362.1 L153 365.2 L154.9 368.1 L156.7 370.4 L158.4 372.2 L160.1 373.3 L161.8 373.9 L163.7 374.3 L165.7 374.4 L167.8 374.6 L169.9 374.9 L172 375.4 L174 376.1 L175.8 377.1 L177.6 378.2 L179.5 379.4 L181.3 380.6 L183.3 381.7 L185.5 382.9 L187.9 384 L190.4 385.2 L193 386.6 L195.6 388.1 L198.1 390 L200.3 392 L202.2 394.4 L203.6 396.9 L204.7 399.6 L205.4 402.4 L205.8 405.2Z" style="fill: {{vase.fill.c5}}; opacity: 0.9"></path>
+<path d="M191.8 406.3 L191.8 408.6 L191.6 410.9 L191.3 413.2 L190.9 415.5 L190.4 417.7 L189.8 420 L189.1 422.2 L188.2 424.3 L187.2 426.4 L186.1 428.4 L184.9 430.4 L183.7 432.4 L182.4 434.4 L181 436.3 L179.6 438.2 L178.1 440 L176.5 441.8 L174.8 443.5 L172.9 445.1 L170.9 446.4 L168.7 447.6 L166.5 448.4 L164.1 449 L161.7 449.3 L159.3 449.4 L156.8 449.3 L154.4 448.9 L152.1 448.4 L149.9 447.7 L147.7 447 L145.6 446.2 L143.6 445.3 L141.6 444.5 L139.7 443.7 L137.9 442.9 L136 442.1 L134.2 441.4 L132.3 440.8 L130.5 440.1 L128.6 439.4 L126.7 438.6 L124.8 437.7 L123 436.8 L121.2 435.7 L119.4 434.5 L117.7 433.3 L116.1 431.9 L114.4 430.4 L112.8 428.9 L111.2 427.4 L109.6 425.7 L108.1 423.9 L106.6 422 L105.4 420 L104.3 417.9 L103.5 415.7 L103 413.4 L102.8 411 L102.8 408.6 L103.1 406.3 L103.6 404 L104.1 401.7 L104.7 399.5 L105.4 397.3 L106 395.1 L106.7 392.9 L107.4 390.8 L108.3 388.7 L109.2 386.7 L110.4 384.7 L111.6 382.9 L113 381.1 L114.5 379.4 L116 377.8 L117.5 376.1 L118.9 374.3 L120.3 372.4 L121.7 370.4 L123.1 368.3 L124.6 366.2 L126.3 364.3 L128.2 362.6 L130.5 361.4 L132.9 360.7 L135.5 360.8 L138.2 361.6 L140.8 363 L143.4 365 L145.6 367.3 L147.7 369.7 L149.5 372 L151.1 374 L152.5 375.6 L154 376.8 L155.4 377.5 L156.9 378 L158.5 378.2 L160.1 378.3 L161.8 378.5 L163.6 378.8 L165.2 379.3 L166.8 380 L168.3 380.8 L169.8 381.7 L171.3 382.7 L172.8 383.7 L174.5 384.6 L176.2 385.5 L178.2 386.5 L180.2 387.5 L182.2 388.7 L184.2 390 L186.1 391.5 L187.7 393.3 L189.1 395.2 L190.2 397.2 L191 399.4 L191.5 401.7 L191.8 404Z" style="fill: {{vase.fill.c6}}; opacity: 0.9"></path>
+</g>
+</svg>
+<svg width="600" height="600" viewBox="-130.0 120.0 600 600" style="position: absolute; left: -60px; top: 117px; pointer-events: none; filter: blur(6px); opacity: {{vase.o}}" aria-hidden="true">
+<g transform="rotate({{vase.rot}} 170.0 420.0)">
+<path d="M178.2 404.5 L178.1 406.2 L178 408 L177.8 409.7 L177.5 411.4 L177.1 413.1 L176.6 414.8 L176 416.5 L175.4 418.1 L174.6 419.7 L173.8 421.2 L172.9 422.7 L172 424.2 L171 425.7 L170 427.2 L168.9 428.6 L167.8 430 L166.5 431.4 L165.2 432.6 L163.8 433.8 L162.2 434.7 L160.6 435.6 L158.9 436.2 L157.1 436.6 L155.3 436.9 L153.5 436.9 L151.6 436.8 L149.9 436.6 L148.1 436.2 L146.4 435.8 L144.8 435.3 L143.2 434.7 L141.6 434.1 L140.2 433.5 L138.7 433 L137.3 432.4 L135.9 431.9 L134.4 431.4 L133 430.9 L131.6 430.4 L130.1 429.8 L128.7 429.2 L127.3 428.5 L125.9 427.8 L124.5 427 L123.2 426 L121.9 425.1 L120.6 424 L119.4 422.9 L118.2 421.7 L117 420.5 L115.8 419.2 L114.6 417.9 L113.6 416.4 L112.7 414.9 L111.9 413.3 L111.4 411.6 L111 409.8 L110.9 408 L110.9 406.2 L111.1 404.5 L111.5 402.7 L111.9 401 L112.3 399.3 L112.7 397.7 L113.2 396 L113.7 394.4 L114.3 392.8 L114.9 391.2 L115.6 389.6 L116.5 388.2 L117.5 386.7 L118.5 385.4 L119.6 384.1 L120.8 382.9 L121.9 381.6 L122.9 380.2 L123.9 378.8 L125 377.2 L126.1 375.7 L127.2 374.1 L128.6 372.7 L130.1 371.5 L131.8 370.7 L133.7 370.3 L135.7 370.5 L137.7 371.1 L139.6 372.2 L141.5 373.6 L143.2 375.2 L144.8 376.9 L146.1 378.4 L147.4 379.8 L148.5 380.8 L149.6 381.6 L150.8 382.1 L152 382.3 L153.2 382.5 L154.5 382.6 L155.8 382.8 L157.1 383.1 L158.4 383.5 L159.6 384.1 L160.8 384.7 L161.9 385.5 L163 386.2 L164.2 386.9 L165.5 387.7 L166.9 388.4 L168.3 389.2 L169.8 390 L171.3 390.9 L172.8 392 L174.1 393.2 L175.3 394.5 L176.3 396 L177 397.6 L177.6 399.3 L177.9 401 L178.1 402.7Z" style="fill: {{vase.fill.c7}}; opacity: 0.95"></path>
+<path d="M164.8 402.7 L164.8 403.9 L164.7 405.1 L164.5 406.3 L164.3 407.5 L164.1 408.7 L163.7 409.8 L163.3 410.9 L162.9 412.1 L162.4 413.1 L161.8 414.2 L161.2 415.2 L160.6 416.3 L159.9 417.3 L159.2 418.3 L158.5 419.3 L157.7 420.2 L156.8 421.1 L155.9 422 L154.9 422.7 L153.9 423.4 L152.7 423.9 L151.6 424.4 L150.3 424.6 L149.1 424.8 L147.9 424.9 L146.6 424.8 L145.4 424.7 L144.2 424.4 L143 424.2 L141.9 423.8 L140.8 423.5 L139.8 423.1 L138.7 422.8 L137.7 422.4 L136.7 422.1 L135.7 421.7 L134.8 421.4 L133.8 421 L132.8 420.7 L131.8 420.3 L130.8 419.9 L129.8 419.4 L128.8 418.9 L127.9 418.3 L127 417.6 L126.1 416.9 L125.3 416.2 L124.4 415.4 L123.6 414.6 L122.8 413.8 L122 412.9 L121.2 411.9 L120.5 410.9 L119.9 409.9 L119.4 408.7 L119.1 407.6 L118.8 406.4 L118.8 405.2 L118.8 403.9 L119 402.7 L119.2 401.5 L119.4 400.4 L119.7 399.2 L120 398.1 L120.3 396.9 L120.6 395.8 L121 394.7 L121.4 393.6 L121.9 392.5 L122.5 391.5 L123.2 390.6 L123.9 389.6 L124.7 388.8 L125.4 387.9 L126.2 387 L126.9 386 L127.6 385 L128.3 384 L129.1 382.9 L129.9 381.9 L130.8 381 L131.9 380.2 L133.1 379.7 L134.4 379.5 L135.7 379.7 L137.1 380.1 L138.5 380.8 L139.7 381.8 L140.9 382.8 L141.9 383.8 L142.9 384.8 L143.7 385.6 L144.5 386.2 L145.3 386.6 L146.2 386.9 L147 387 L147.9 387.1 L148.8 387.2 L149.7 387.4 L150.6 387.6 L151.5 388 L152.3 388.4 L153.1 388.9 L153.9 389.4 L154.7 389.9 L155.6 390.4 L156.5 390.9 L157.4 391.5 L158.4 392 L159.4 392.6 L160.4 393.3 L161.4 394.1 L162.3 394.9 L163 395.9 L163.6 396.9 L164.1 398 L164.4 399.2 L164.6 400.3 L164.8 401.5Z" style="fill: {{vase.fill.c8}}; opacity: 0.95"></path>
+</g>
+</svg>
+<img draggable="false" src="assets/images/grain.jpg" alt="" style="position: absolute; left: 0; top: 0; width: 1194px; height: 834px; display: block; pointer-events: none; mix-blend-mode: soft-light; opacity: 0.22">
+<sc-if value="{{show.knob}}" hint-placeholder-val="{{ false }}">
+<sc-for list="{{tb}}" as="b" hint-placeholder-count="3">
+<div style="position: absolute; left: {{b.l}}px; top: {{b.t}}px; width: {{b.w}}px; height: {{b.h}}px; border-radius: 50%; pointer-events: none; mix-blend-mode: screen; transform: rotate({{b.r}}deg); opacity: {{b.o}}; background: radial-gradient(closest-side, rgba(255, 255, 255, 0.9) 0%, {{b.c}} 45%, rgba(255, 255, 255, 0) 100%); filter: blur(6px)"></div>
+</sc-for>
+<svg width="1194" height="834" viewBox="0 0 1194 834" style="position: absolute; left: 0; top: 0; pointer-events: none" aria-hidden="true">
+<path d="{{arcR.od0}}" style="fill: none; stroke: {{arcR.c}}; stroke-width: 0.7px; opacity: 0.34"></path>
+<path d="{{arcR.od1}}" style="fill: none; stroke: {{arcR.c}}; stroke-width: 0.7px; opacity: 0.27"></path>
+<path d="{{arcR.od2}}" style="fill: none; stroke: {{arcR.c}}; stroke-width: 0.7px; opacity: 0.20"></path>
+<path d="{{arcR.d0}}" style="fill: none; stroke: {{arcR.c}}; stroke-width: {{arcR.w0}}px; stroke-linejoin: round; opacity: {{arcR.o0}}"></path>
+<path d="{{arcR.d1}}" style="fill: none; stroke: {{arcR.c}}; stroke-width: {{arcR.w1}}px; stroke-linejoin: round; opacity: {{arcR.o1}}"></path>
+<path d="{{arcR.d2}}" style="fill: none; stroke: {{arcR.c}}; stroke-width: {{arcR.w2}}px; stroke-linejoin: round; opacity: {{arcR.o2}}"></path>
+<path d="{{arcR.d3}}" style="fill: none; stroke: {{arcR.c}}; stroke-width: {{arcR.w3}}px; stroke-linejoin: round; opacity: {{arcR.o3}}"></path>
+<path d="{{arcR.d4}}" style="fill: none; stroke: {{arcR.c}}; stroke-width: {{arcR.w4}}px; stroke-linejoin: round; opacity: {{arcR.o4}}"></path>
+<path d="{{arcR.d5}}" style="fill: none; stroke: {{arcR.c}}; stroke-width: {{arcR.w5}}px; stroke-linejoin: round; opacity: {{arcR.o5}}"></path>
+<path d="{{arcR.d6}}" style="fill: none; stroke: {{arcR.c}}; stroke-width: {{arcR.w6}}px; stroke-linejoin: round; opacity: {{arcR.o6}}"></path>
+<path d="{{arcR.thread}}" style="fill: none; stroke: #FFFFFF; stroke-width: 0.8px; opacity: {{arcR.threadO}}"></path>
+<circle cx="240" cy="417" r="195" style="fill: none; stroke: rgba(255, 255, 255, 0.34); stroke-width: 1"></circle>
+<path d="M240 218 L240 198" style="fill: none; stroke: #FFFFFF; stroke-width: 1.6; stroke-linecap: round"></path>
+<g style="opacity: {{knob.arrowO}}">
+<path d="M283.9 210.6 A211 211 0 0 1 442.8 358.8" style="fill: none; stroke: #FFFFFF; stroke-width: 1.1; stroke-linecap: round"></path>
+<path d="M445.1 348.0 L442.8 358.8 L435.2 350.9" style="fill: none; stroke: #FFFFFF; stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round"></path>
+</g>
+</svg>
+<sc-for list="{{rdots}}" as="d" hint-placeholder-count="4">
+<div style="position: absolute; left: {{d.l}}px; top: {{d.t}}px; width: {{d.d}}px; height: {{d.d}}px; border-radius: 50%; background: #FFFFFF; opacity: {{d.o}}; box-shadow: 0 0 10px rgba(255, 255, 255, 0.9); pointer-events: none"></div>
+</sc-for>
+<button type="button" aria-label="Turn the vase to move through the year; arrow keys also turn it" onPointerDown="{{knob.down}}" onPointerMove="{{knob.move}}" onPointerUp="{{knob.up}}" onPointerCancel="{{knob.up}}" onKeyDown="{{knob.key}}" style="position: absolute; left: 5px; top: 182px; width: 470px; height: 470px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: grab; touch-action: none"></button>
+<div style="position: absolute; left: 100px; top: 638px; width: 280px; display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: none">
+<div style="display: flex; align-items: center; gap: 7px">
+<div style="width: 9px; height: 9px; border-radius: 50%; background: {{tread.c}}; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7)"></div>
+<div style="font-size: 13.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: #2F2A55">{{tread.t}}</div>
+<div style="font-size: 12.5px; color: #4E4880">{{tread.word}}</div>
+</div>
+<div style="font-size: 12.5px; color: #4E4880">{{tread.voice}}</div>
+<div style="font-size: 12px; color: #4E4880; opacity: 0.8">Turn the vase to look back</div>
+</div>
+</sc-if>
+<div style="position: absolute; left: 460px; top: 20px; width: 718px; height: 48px; display: flex; align-items: center; gap: 12px">
+<div style="width: 130px; flex-shrink: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #4E4880; white-space: nowrap">Family threads</div>
+<div style="position: relative; width: 464px; height: 48px; flex-shrink: 0">
+<svg width="464" height="48" viewBox="0 0 464 48" style="position: absolute; left: 0; top: 0; overflow: visible" aria-hidden="true">
+<path d="M0 25.15 L6 25.34 L12 25.52 L18 25.69 L24 25.84 L30 25.98 L36 26.09 L42 26.19 L48 26.28 L54 26.34 L60 26.38 L66 26.4 L72 26.4 L78 26.38 L84 26.33 L90 26.27 L96 26.19 L102 26.09 L108 25.97 L114 25.83 L120 25.68 L126 25.51 L132 25.33 L138 25.13 L144 24.93 L150 24.72 L156 24.51 L162 24.28 L168 24.06 L174 23.84 L180 23.61 L186 23.39 L192 23.18 L198 22.97 L204 22.78 L210 22.59 L216 22.41 L222 22.25 L228 22.11 L234 21.98 L240 21.87 L246 21.77 L252 21.7 L258 21.65 L264 21.61 L270 21.6 L276 21.61 L282 21.64 L288 21.69 L294 21.76 L300 21.85 L306 21.96 L312 22.08 L318 22.23 L324 22.39 L330 22.56 L336 22.74 L342 22.94 L348 23.15 L354 23.36 L360 23.58 L366 23.8 L372 24.02 L378 24.25 L384 24.47 L390 24.69 L396 24.9 L402 25.1 L408 25.3 L414 25.48 L420 25.65 L426 25.8 L432 25.94 L438 26.07 L444 26.17 L450 26.26 L456 26.32 L462 26.37" style="fill: none; stroke: rgba(47, 42, 85, 0.22); stroke-width: 1"></path>
+<circle cx="{{rail.x0}}" cy="{{rail.y0}}" r="2.6" style="fill: #FFFFFF; opacity: {{rail.o0}}"></circle>
+<circle cx="{{rail.x1}}" cy="{{rail.y1}}" r="2.6" style="fill: #FFFFFF; opacity: {{rail.o1}}"></circle>
+<circle cx="{{rail.x2}}" cy="{{rail.y2}}" r="2.6" style="fill: #FFFFFF; opacity: {{rail.o2}}"></circle>
+<circle cx="{{rail.x3}}" cy="{{rail.y3}}" r="2.6" style="fill: #FFFFFF; opacity: {{rail.o3}}"></circle>
+<circle cx="{{rail.mx}}" cy="{{rail.my}}" r="{{rail.ringR}}" style="fill: none; stroke: #FFFFFF; stroke-width: 1.4; opacity: {{rail.ringO}}"></circle>
+<circle cx="{{rail.mx}}" cy="{{rail.my}}" r="4.8" style="fill: #FFFFFF; stroke: rgba(91, 79, 160, 0.35); stroke-width: 1; opacity: {{rail.kO}}"></circle>
+</svg>
+<div style="position: absolute; left: {{rail.lx}}px; top: 33px; width: 90px; text-align: center; font-size: 11px; font-weight: 500; color: #4E4880; white-space: nowrap; opacity: {{rail.kO}}">{{rail.date}}</div>
+</div>
+<button type="button" onClick="{{rail.act}}" style="width: 100px; height: 44px; flex-shrink: 0; border: 1px solid rgba(255, 255, 255, 0.75); border-radius: 22px; background: rgba(255, 255, 255, 0.4); color: #2F2A55; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer">{{rail.label}}</button>
+</div>
+<div style="position: absolute; left: 460px; top: 0; width: 440px; height: 834px; pointer-events: none; text-shadow: 0 1px 14px rgba(255, 255, 255, 0.3)">
+<sc-if value="{{show.prompt}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; top: 417px; transform: translateY(-50%); width: 560px; display: flex; flex-direction: column; gap: 12px; opacity: {{words.promptO}}">
+<div style="font-size: 32px; font-weight: 600; line-height: 1.2; color: #2F2A55">Lift the vase and say a few words.</div>
+<div style="font-size: 15px; line-height: 1.5; color: #4E4880">Set it back on its spot when you finish.</div>
+</div>
+</sc-if>
+<sc-if value="{{show.ready}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; top: 417px; transform: translateY(-50%); width: 560px; display: flex; flex-direction: column; gap: 12px; opacity: {{words.readyO}}">
+<div style="font-size: 32px; font-weight: 600; line-height: 1.2; color: #2F2A55">Speak when ready.</div>
+<div style="font-size: 15px; line-height: 1.5; color: #4E4880">Rings on the table follow the voice.</div>
+</div>
+</sc-if>
+<sc-if value="{{show.status}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; top: 417px; transform: translateY(-50%); width: 440px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px">
+<div style="height: 28px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border-radius: 9px; background: #7C73B8; text-shadow: none">
+<div style="width: 7px; height: 7px; border-radius: 4px; background: #FFFFFF; opacity: {{words.dotO}}; box-shadow: 0 0 8px #FFFFFF"></div>
+<div style="font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: #FFFFFF; white-space: nowrap">{{words.status}}</div>
+</div>
+<div style="width: 440px; height: 148px; font-family: 'Newsreader', 'Iowan Old Style', Georgia, serif; font-size: 25px; font-weight: 400; line-height: 36px; color: #2F2A55; text-wrap: pretty"><sc-for list="{{lines}}" as="ln" hint-placeholder-count="5"><span style="color: {{ln.col}}">{{ln.txt}}</span></sc-for></div>
+</div>
+</sc-if>
+<sc-if value="{{show.kept}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; top: 417px; transform: translateY(-50%); width: 440px; display: flex; flex-direction: column; gap: 10px; opacity: {{words.keptO}}">
+<div style="font-family: 'Caveat', 'Bradley Hand', 'Segoe Print', cursive; font-size: 64px; font-weight: 700; line-height: 0.9; color: #2F2A55">Kept.</div>
+<div style="font-size: 18px; font-weight: 500; line-height: 1.3; color: #2F2A55">25 Sep 2026 · Mid-Autumn Festival</div>
+<div style="font-size: 14px; line-height: 1.55; color: #4E4880">Original voice, words, date and image are stored as they are. The shard joins the vase; nothing is regenerated later.</div>
+</div>
+</sc-if>
+<sc-if value="{{show.revisit}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 0; top: 417px; transform: translateY(-50%); width: 440px; display: flex; flex-direction: column; gap: 14px; opacity: {{rv.hO}}; pointer-events: auto">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 2px">
+<div style="font-family: 'Caveat', 'Bradley Hand', 'Segoe Print', cursive; font-size: 36px; font-weight: 700; line-height: 1; color: #2F2A55">{{rv.date}}</div>
+<div style="font-size: 12.5px; line-height: 1.4; color: #4E4880">{{rv.meta}}</div>
+</div>
+<div style="display: flex; gap: 10px; text-shadow: none">
+<button type="button" onClick="{{rv.read}}" aria-pressed="{{rv.rp}}" style="height: 46px; padding: 0 20px; display: flex; align-items: center; gap: 8px; border: none; border-radius: 23px; background: {{rv.rBg}}; color: {{rv.rFg}}; box-shadow: 0 6px 18px rgba(72, 60, 140, 0.12); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>Read</button>
+<button type="button" onClick="{{rv.listen}}" aria-pressed="{{rv.lp}}" style="height: 46px; padding: 0 20px; display: flex; align-items: center; gap: 8px; border: none; border-radius: 23px; background: {{rv.lBg}}; color: {{rv.lFg}}; box-shadow: 0 6px 18px rgba(72, 60, 140, 0.12); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">Listen<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg></button>
+</div>
+</div>
+<div style="display: flex; align-items: center; height: 20px">
+<sc-if value="{{show.prog}}" hint-placeholder-val="{{ true }}">
+<div style="display: flex; align-items: center; gap: 10px">
+<div style="position: relative; width: 200px; height: 3px; border-radius: 2px; background: rgba(47, 42, 85, 0.14)">
+<div style="position: absolute; left: 0; top: 0; height: 3px; width: {{rv.pw}}px; border-radius: 2px; background: {{rv.pc}}; box-shadow: 0 0 8px {{rv.pc}}"></div>
+</div>
+<div style="font-size: 12.5px; font-variant-numeric: tabular-nums; color: #4E4880; white-space: nowrap">{{rv.time}}</div>
+</div>
+</sc-if>
+<sc-if value="{{show.again}}" hint-placeholder-val="{{ false }}">
+<button type="button" onClick="{{rv.again}}" style="height: 44px; margin: -12px 0; padding: 0; border: none; background: transparent; color: #2F2A55; font: inherit; font-size: 13.5px; text-decoration: underline; cursor: pointer">Play again</button>
+</sc-if>
+</div>
+<div style="width: 440px; height: 148px; font-family: 'Newsreader', 'Iowan Old Style', Georgia, serif; font-size: 25px; font-weight: 400; line-height: 36px; color: #2F2A55; text-wrap: pretty"><sc-for list="{{rvLines}}" as="ln" hint-placeholder-count="5"><span style="color: {{ln.col}}">{{ln.txt}}</span></sc-for></div>
+</div>
+</sc-if>
+</div>
+<sc-if value="{{show.card}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 954px; top: 267px; width: 212px; height: 300px; perspective: 900px; transform-origin: 50% 50%; transform: translate({{card.tx}}px, {{card.ty2}}px) scale({{card.sc}}) rotate(1.4deg); opacity: {{card.o}}">
+<button type="button" onPointerDown="{{slot.down}}" onPointerMove="{{slot.move}}" onPointerUp="{{slot.up}}" onPointerCancel="{{slot.up}}" onPointerLeave="{{slot.leave}}" onClick="{{slot.click}}" aria-label="The shard made from this record; tap to open, drag to lift it" style="position: relative; display: block; width: 212px; height: 300px; padding: 0; border: none; background: transparent; cursor: grab; touch-action: none; transform-style: preserve-3d; transform: rotateX({{tl.rx}}deg) rotateY({{tl.ry}}deg) scale({{tl.s}}); transition: transform 0.2s ease-out; filter: drop-shadow({{tl.sx1}}px {{tl.sy1}}px 10px rgba(72, 60, 140, 0.3)) drop-shadow({{tl.sx2}}px {{tl.sy2}}px 28px rgba(72, 60, 140, 0.22)) drop-shadow(0 0 30px {{card.glow}})">
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; transform: translate(2px, 5px); background: linear-gradient(165deg, #F3EADC, #C7B8A0); clip-path: polygon(12.73% 0.0%, 6.67% 18.8%, 7.27% 44.87%, 0.0% 61.97%, 64.24% 100.0%, 85.45% 100.0%, 89.09% 61.11%, 100.0% 19.66%, 98.79% 8.12%, 92.73% 4.27%, 69.09% 1.71%)"></div>
+<div style="position: relative; width: 100%; height: 100%; overflow: hidden; clip-path: polygon(12.73% 0.0%, 6.67% 18.8%, 7.27% 44.87%, 0.0% 61.97%, 64.24% 100.0%, 85.45% 100.0%, 89.09% 61.11%, 100.0% 19.66%, 98.79% 8.12%, 92.73% 4.27%, 69.09% 1.71%); background: #F2E7D5">
+<sc-for list="{{blobs}}" as="bl" hint-placeholder-count="0">
+<div style="position: absolute; left: {{bl.x}}px; top: {{bl.y}}px; width: {{bl.s}}px; height: {{bl.s}}px; overflow: hidden; -webkit-mask-image: radial-gradient(closest-side, #000 40%, rgba(0, 0, 0, 0) 100%); mask-image: radial-gradient(closest-side, #000 40%, rgba(0, 0, 0, 0) 100%)">
+<img draggable="false" src="assets/images/mid-autumn.jpg" alt="" style="position: absolute; left: {{bl.ix}}px; top: {{bl.iy}}px; width: 392.9px; height: 653.7px; max-width: none">
+</div>
+</sc-for>
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: {{card.fullO}}">
+<img draggable="false" src="{{card.img}}" alt="Family memory artwork" style="position: absolute; {{card.imageStyle}}; max-width: none">
+</div>
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; background-image: linear-gradient(158deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 32%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.14) 100%)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: soft-light; opacity: {{tl.rain}}; background-image: linear-gradient(115deg, #F3C6D6 0%, #F6D9C4 18%, #E9D8F2 36%, #CDD6F2 54%, #E2CDEE 72%, #F3C6D6 100%); background-size: 320% 320%; background-position: {{tl.bx}}% {{tl.by}}%"></div>
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: hard-light; opacity: {{tl.glare}}; background-image: radial-gradient(farthest-corner circle at {{tl.gx}}% {{tl.gy}}%, rgba(255, 255, 255, 0.5) 8%, rgba(255, 255, 255, 0.12) 24%, rgba(60, 50, 120, 0.2) 92%)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; opacity: {{tl.spec}}; background-image: radial-gradient(circle at {{tl.gx}}% {{tl.gy}}%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.6) 5%, rgba(255, 255, 255, 0) 40%)"></div>
+</div>
+</button>
+</div>
+</sc-if>
+<sc-if value="{{show.hint}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 930px; top: 593px; width: 260px; display: flex; justify-content: center; align-items: center; gap: 8px; opacity: {{hint.o}}; pointer-events: none">
+<div style="width: 7px; height: 7px; border-radius: 4px; background: #FFFFFF; box-shadow: 0 0 10px #FFFFFF"></div>
+<div style="font-size: 13.5px; font-weight: 500; letter-spacing: 0.02em; color: #4E4880">Tap the shard to open</div>
+</div>
+</sc-if>
+<sc-if value="{{show.rvcard}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: {{rvc.l}}px; top: {{rvc.t}}px; width: {{rvc.w}}px; height: {{rvc.h}}px; perspective: 900px; transform: translate({{card.tx}}px, {{card.ty2}}px) rotate(1.4deg)">
+<button type="button" onPointerDown="{{rvf.down}}" onPointerMove="{{rvf.move}}" onPointerUp="{{rvf.up}}" onPointerCancel="{{rvf.up}}" onPointerLeave="{{rvf.leave}}" onClick="{{rvf.click}}" aria-label="The shard of this record; drag to lift it" style="position: relative; display: block; width: {{rvc.w}}px; height: {{rvc.h}}px; padding: 0; border: none; background: transparent; cursor: grab; touch-action: none; transform-style: preserve-3d; transform: rotateX({{tl.rx}}deg) rotateY({{tl.ry}}deg) scale({{tl.s}}); transition: transform 0.2s ease-out; filter: drop-shadow({{tl.sx1}}px {{tl.sy1}}px 10px rgba(72, 60, 140, 0.3)) drop-shadow({{tl.sx2}}px {{tl.sy2}}px 28px rgba(72, 60, 140, 0.22)) drop-shadow(0 0 30px {{card.glow}})">
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; transform: translate(2px, 5px); background: linear-gradient(165deg, #F3EADC, #C7B8A0); clip-path: {{rvc.clip}}"></div>
+<div style="position: relative; width: 100%; height: 100%; overflow: hidden; clip-path: {{rvc.clip}}; background: #F2E7D5">
+<img draggable="false" src="{{rvc.img}}" alt="{{rvc.alt}}" style="position: absolute; left: {{rvc.il}}%; top: {{rvc.it}}%; width: {{rvc.iw}}%; height: {{rvc.ih}}%; max-width: none">
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; background-image: linear-gradient(158deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 32%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.14) 100%)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: soft-light; opacity: {{tl.rain}}; background-image: linear-gradient(115deg, #F3C6D6 0%, #F6D9C4 18%, #E9D8F2 36%, #CDD6F2 54%, #E2CDEE 72%, #F3C6D6 100%); background-size: 320% 320%; background-position: {{tl.bx}}% {{tl.by}}%"></div>
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: hard-light; opacity: {{tl.glare}}; background-image: radial-gradient(farthest-corner circle at {{tl.gx}}% {{tl.gy}}%, rgba(255, 255, 255, 0.5) 8%, rgba(255, 255, 255, 0.12) 24%, rgba(60, 50, 120, 0.2) 92%)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; opacity: {{tl.spec}}; background-image: radial-gradient(circle at {{tl.gx}}% {{tl.gy}}%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.6) 5%, rgba(255, 255, 255, 0) 40%)"></div>
+</div>
+</button>
+</div>
+</sc-if>
+<sc-if value="{{show.open}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 440px; top: 84px; width: 740px; height: 664px; opacity: {{sheet.o}}; transform: translateY({{sheet.y}}px)">
+<div style="position: absolute; left: 0px; top: 132px; width: 404px; height: 420px; transform: rotate(-4.6deg); background: rgba(255, 255, 255, 0.36); clip-path: polygon(2% 4%, 30% 0%, 62% 5%, 97% 1%, 100% 38%, 96% 70%, 99% 97%, 64% 100%, 35% 95%, 4% 100%, 0% 66%, 3% 34%)"></div>
+<div style="position: absolute; left: 14px; top: 106px; width: 410px; height: 440px; transform: rotate(-1.6deg); filter: drop-shadow(0 16px 24px rgba(72, 60, 140, 0.2))">
+<div style="position: relative; width: 410px; height: 440px; background-color: #FCF8F2; background-image: linear-gradient(90deg, rgba(232, 150, 164, 0) 58px, rgba(232, 150, 164, 0.6) 58px, rgba(232, 150, 164, 0.6) 59px, rgba(232, 150, 164, 0) 59px), repeating-linear-gradient(180deg, rgba(124, 115, 184, 0) 0px, rgba(124, 115, 184, 0) 35px, rgba(124, 115, 184, 0.22) 35px, rgba(124, 115, 184, 0.22) 36px); background-position: 0 0, 0 14px; clip-path: polygon(0.4% 0.8%, 21% 0.2%, 47% 0.9%, 74% 0%, 99.6% 0.7%, 99.1% 24%, 100% 51%, 99.3% 77%, 99.8% 99.4%, 72% 100%, 45% 99.2%, 19% 99.9%, 0.2% 99.3%, 0.9% 71%, 0% 44%, 0.7% 18%)">
+<div style="position: absolute; left: 76px; top: 30px; width: 310px; font-family: 'Caveat', 'Bradley Hand', 'Segoe Print', cursive; font-size: 44px; font-weight: 700; line-height: 46px; color: #2F2A55">25 Sep 2026</div>
+<svg width="190" height="14" viewBox="0 0 190 14" style="position: absolute; left: 74px; top: 78px" aria-hidden="true"><path d="M2 8 C30 3 52 12 82 7 S140 3 188 8" style="fill: none; stroke: #E58C9E; stroke-width: 2.4; stroke-linecap: round"></path></svg>
+<div style="position: absolute; left: 78px; top: 102px; width: 310px; font-family: 'Caveat', 'Bradley Hand', 'Segoe Print', cursive; font-size: 24px; font-weight: 500; line-height: 30px; color: #4E4880">Mid-Autumn Festival · 0:13</div>
+<div style="position: absolute; left: 78px; top: 164px; width: 306px; font-family: 'Caveat', 'Bradley Hand', 'Segoe Print', cursive; font-size: 29px; font-weight: 500; line-height: 36px; color: #2F2A55; text-wrap: pretty">{{note.text}}</div>
+</div>
+</div>
+<div style="position: absolute; left: 150px; top: 92px; width: 118px; height: 30px; transform: rotate(-5deg); background: rgba(226, 216, 247, 0.78); box-shadow: 0 1px 2px rgba(72, 60, 140, 0.08); clip-path: polygon(3% 0%, 97% 0%, 100% 20%, 96% 40%, 100% 60%, 96% 80%, 99% 100%, 2% 100%, 0% 80%, 4% 60%, 0% 40%, 4% 20%)"></div>
+<div style="position: absolute; left: 448px; top: 133px; width: 282px; height: 400px; perspective: 1100px; transform: translate({{card.tx}}px, {{card.ty2}}px) rotate(2.2deg)">
+<button type="button" onPointerDown="{{opn.down}}" onPointerMove="{{opn.move}}" onPointerUp="{{opn.up}}" onPointerCancel="{{opn.up}}" onPointerLeave="{{opn.leave}}" onClick="{{opn.click}}" aria-label="The shard made from this record; drag to lift it" style="position: relative; display: block; width: 282px; height: 400px; padding: 0; border: none; background: transparent; cursor: grab; touch-action: none; transform-style: preserve-3d; transform: rotateX({{tl.rx}}deg) rotateY({{tl.ry}}deg) scale({{tl.s}}); transition: transform 0.2s ease-out; filter: drop-shadow({{tl.sx1}}px {{tl.sy1}}px 10px rgba(72, 60, 140, 0.3)) drop-shadow({{tl.sx2}}px {{tl.sy2}}px 28px rgba(72, 60, 140, 0.22)) drop-shadow(0 0 30px {{card.glow}})">
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; transform: translate(2px, 5px); background: linear-gradient(165deg, #F3EADC, #C7B8A0); clip-path: polygon(12.73% 0.0%, 6.67% 18.8%, 7.27% 44.87%, 0.0% 61.97%, 64.24% 100.0%, 85.45% 100.0%, 89.09% 61.11%, 100.0% 19.66%, 98.79% 8.12%, 92.73% 4.27%, 69.09% 1.71%)"></div>
+<div style="position: relative; width: 100%; height: 100%; overflow: hidden; clip-path: polygon(12.73% 0.0%, 6.67% 18.8%, 7.27% 44.87%, 0.0% 61.97%, 64.24% 100.0%, 85.45% 100.0%, 89.09% 61.11%, 100.0% 19.66%, 98.79% 8.12%, 92.73% 4.27%, 69.09% 1.71%); background: #F2E7D5">
+<img draggable="false" src="{{card.img}}" alt="Family memory artwork" style="position: absolute; {{card.imageStyle}}; max-width: none">
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; background-image: linear-gradient(158deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 32%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.14) 100%)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: soft-light; opacity: {{tl.rain}}; background-image: linear-gradient(115deg, #F3C6D6 0%, #F6D9C4 18%, #E9D8F2 36%, #CDD6F2 54%, #E2CDEE 72%, #F3C6D6 100%); background-size: 320% 320%; background-position: {{tl.bx}}% {{tl.by}}%"></div>
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: hard-light; opacity: {{tl.glare}}; background-image: radial-gradient(farthest-corner circle at {{tl.gx}}% {{tl.gy}}%, rgba(255, 255, 255, 0.5) 8%, rgba(255, 255, 255, 0.12) 24%, rgba(60, 50, 120, 0.2) 92%)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; opacity: {{tl.spec}}; background-image: radial-gradient(circle at {{tl.gx}}% {{tl.gy}}%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.6) 5%, rgba(255, 255, 255, 0) 40%)"></div>
+</div>
+</button>
+</div>
+<div style="position: absolute; left: 22px; top: 582px; width: 380px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; gap: 10px">
+<button type="button" onClick="{{keep}}" style="flex-grow: 1; height: 52px; border: none; border-radius: 26px; background: #FFFFFF; color: #5B4FA0; box-shadow: 0 8px 22px rgba(72, 60, 140, 0.16); font: inherit; font-size: 16px; font-weight: 600; cursor: pointer">Keep this record</button>
+<button type="button" onClick="{{notNow}}" style="height: 52px; padding: 0 22px; border: 1px solid rgba(255, 255, 255, 0.75); border-radius: 26px; background: rgba(255, 255, 255, 0.36); color: #2F2A55; font: inherit; font-size: 15px; font-weight: 500; cursor: pointer">Not now</button>
+</div>
+<div style="font-size: 12.5px; line-height: 1.45; color: #4E4880">Words, date and image stay as they are.</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{show.archive}}" hint-placeholder-val="{{ false }}">
+<div style="position: absolute; left: 470px; top: 267px; width: 400px; display: flex; flex-direction: column; gap: 8px; opacity: {{arcv.o}}">
+<div style="width: 36px; height: 2px; border-radius: 1px; background: #E3868B"></div>
+<div style="font-size: 30px; font-weight: 600; line-height: 1.1; color: #2F2A55">Family threads</div>
+<div style="font-size: 13px; color: #4E4880">{{tline.count}}</div>
+</div>
+<div style="position: absolute; left: 460px; top: 357px; width: 420px; height: 120px; overflow: hidden; pointer-events: none; opacity: {{arcv.o}}; -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 12%, #000 88%, rgba(0, 0, 0, 0) 100%); mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, #000 12%, #000 88%, rgba(0, 0, 0, 0) 100%)">
+<div style="position: absolute; left: {{tline.bandL}}px; top: 57px; width: {{tline.bandW}}px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.62)"></div>
+<div style="position: absolute; left: 0; top: 60px; width: 420px; height: 1px; background: rgba(47, 42, 85, 0.34)"></div>
+<sc-for list="{{months}}" as="mo" hint-placeholder-count="12">
+<div style="position: absolute; left: {{mo.l}}px; top: 56px; width: 1px; height: 8px; background: rgba(47, 42, 85, 0.26)"></div>
+<div style="position: absolute; left: {{mo.lt}}px; top: 14px; width: 32px; text-align: center; font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #4E4880">{{mo.label}}</div>
+</sc-for>
+<svg width="420" height="120" viewBox="0 0 420 120" style="position: absolute; left: 0; top: 0" aria-hidden="true">
+<path d="{{tline.threadA}}" style="fill: none; stroke: rgba(47, 42, 85, 0.5); stroke-width: 1.1"></path>
+<path d="{{tline.threadB}}" style="fill: none; stroke: rgba(47, 42, 85, 0.42); stroke-width: 1.1; stroke-dasharray: 1.5px 4px; stroke-linecap: round"></path>
+</svg>
+<sc-for list="{{knots}}" as="kn" hint-placeholder-count="4">
+<div style="position: absolute; left: {{kn.l}}px; top: 56.5px; width: 7px; height: 7px; border-radius: 50%; background: #5B4FA0; opacity: {{kn.o}}; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55)"></div>
+</sc-for>
+<div style="position: absolute; left: {{tline.leadL}}px; top: 70px; width: 1px; height: 50px; background: #E3868B"></div>
+<div style="position: absolute; left: {{tline.mL}}px; top: 50px; width: 20px; height: 20px; border-radius: 6px; background: #E3868B; box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.6), 0 6px 14px rgba(72, 60, 140, 0.25)"><svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true" style="position: absolute; left: 5px; top: 5px"><path d="M2 1.5 L7.5 1 L9 5.5 L5.5 9 L1 7.5 Z" style="fill: #FFFFFF"></path></svg></div>
+</div>
+<div style="position: absolute; left: 610px; top: 477px; width: 270px; display: flex; flex-direction: column; gap: 6px; opacity: {{arcv.o}}">
+<div style="font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #5B4FA0">{{tline.label}}</div>
+<div style="width: 22px; height: 1.5px; background: #E3868B"></div>
+<div style="font-family: 'Caveat', 'Bradley Hand', 'Segoe Print', cursive; font-size: 34px; font-weight: 700; line-height: 1; color: #2F2A55">{{tline.date}}</div>
+<div style="font-size: 12.5px; color: #4E4880">{{tline.meta}}</div>
+<div style="min-height: 52px; font-family: 'Newsreader', 'Iowan Old Style', Georgia, serif; font-size: 18px; line-height: 1.42; color: #2F2A55; text-wrap: pretty">{{tline.ex}}</div>
+<button type="button" onClick="{{tline.open}}" style="margin-top: 6px; align-self: flex-start; height: 44px; padding: 0 22px; border: none; border-radius: 26px; background: #FFFFFF; color: #5B4FA0; box-shadow: 0 8px 22px rgba(72, 60, 140, 0.16); font: inherit; font-size: 14.5px; font-weight: 600; cursor: pointer">Open this record</button>
+</div>
+<div style="position: absolute; left: 919px; top: 230px; width: 351px; height: 520px; perspective: 1000px; transform: scale(0.72); transform-origin: 0 0">
+<svg width="351" height="520" viewBox="0 0 351 520" style="position: absolute; left: 0; top: 0; overflow: visible" aria-hidden="true">
+<polygon points="39.5,520.0 37.0,515.5 33.5,511.0 29.0,507.0 25.0,502.5 21.0,498.0 18.0,494.0 15.0,489.5 12.0,485.0 10.0,481.0 7.5,476.5 6.0,472.0 4.5,468.0 3.5,463.5 2.5,459.0 2.0,455.0 1.5,450.5 1.0,446.0 1.0,442.0 1.0,437.5 1.0,433.0 1.0,429.0 1.5,424.5 4.0,420.0 5.0,416.0 6.0,411.5 6.5,407.0 6.0,403.0 7.5,398.5 9.0,394.0 11.0,390.0 13.0,385.5 15.0,381.0 17.5,377.0 21.0,372.5 24.0,368.0 27.5,364.0 31.5,359.5 35.0,355.0 39.5,351.0 47.0,346.5 54.0,342.0 59.0,338.0 62.5,333.5 64.0,329.0 70.0,325.0 75.5,320.5 80.5,316.0 84.0,312.0 86.0,307.5 89.0,303.0 91.5,299.0 94.5,294.5 97.0,290.0 101.5,286.0 104.5,281.5 106.5,277.0 108.0,273.0 108.0,268.5 109.5,264.0 113.0,260.0 115.0,255.5 116.5,251.0 119.0,247.0 120.0,242.5 122.0,238.0 122.5,234.0 121.5,229.5 120.5,225.0 121.0,221.0 123.5,216.5 126.0,212.0 126.5,208.0 128.5,203.5 129.0,199.0 129.5,195.0 129.5,190.5 127.5,186.0 126.5,182.0 126.0,177.5 126.5,173.0 126.5,169.0 127.0,164.5 127.0,160.0 127.0,156.0 127.0,151.5 128.0,147.0 130.5,143.0 131.0,138.5 130.5,134.0 129.0,130.0 127.0,125.5 126.5,121.0 126.5,117.0 126.0,112.5 126.0,108.0 125.5,104.0 127.0,99.5 128.5,95.0 128.5,91.0 127.5,86.5 124.5,82.0 123.5,78.0 123.0,73.5 122.5,69.0 123.5,65.0 125.0,60.5 125.5,56.0 124.5,52.0 121.5,47.5 119.5,43.0 119.5,39.0 120.5,34.5 121.5,30.0 121.0,26.0 119.0,21.5 116.5,17.0 114.5,13.0 114.5,8.5 114.5,4.0 114.5,0.0 236.0,2.0 236.0,6.5 236.0,10.5 235.5,15.0 233.0,19.5 230.5,23.5 229.0,28.0 229.5,32.5 230.5,36.5 231.0,41.0 230.0,45.5 227.5,49.5 225.5,54.0 225.5,58.5 226.0,62.5 228.0,67.0 228.0,71.5 227.5,75.5 226.5,80.0 224.5,84.5 222.5,88.5 222.0,93.0 222.5,97.5 224.5,101.5 224.5,106.0 224.5,110.5 224.0,114.5 224.0,119.0 223.5,123.5 223.0,127.5 220.5,132.0 219.5,136.5 219.5,140.5 221.5,145.0 223.0,149.5 223.5,153.5 223.5,158.0 223.5,162.5 223.5,166.5 224.0,171.0 224.5,175.5 224.5,179.5 223.5,184.0 222.0,188.5 220.5,192.5 221.5,197.0 222.0,201.5 223.0,205.5 224.0,210.0 225.5,214.5 228.5,218.5 229.5,223.0 229.5,227.5 228.5,231.5 227.5,236.0 229.5,240.5 231.5,244.5 233.0,249.0 234.5,253.5 236.0,257.5 239.5,262.0 241.5,266.5 243.0,270.5 243.0,275.0 245.0,279.5 247.0,283.5 251.5,288.0 255.0,292.5 257.5,296.5 260.0,301.0 263.0,305.5 266.0,309.5 268.0,314.0 272.0,318.5 277.0,322.5 284.0,327.0 287.5,331.5 289.0,335.5 293.5,340.0 300.0,344.5 308.0,348.5 313.5,353.0 317.5,357.5 321.0,361.5 324.5,366.0 328.0,370.5 331.0,374.5 334.5,379.0 336.5,383.5 338.5,387.5 340.5,392.0 342.0,396.5 343.5,400.5 344.5,405.0 344.0,409.5 345.0,413.5 345.5,418.0 348.0,422.5 349.0,426.5 349.5,431.0 349.5,435.5 349.5,439.5 349.5,444.0 349.5,448.5 349.0,452.5 348.0,457.0 347.5,461.5 346.5,465.5 345.0,470.0 343.5,474.5 341.5,478.5 339.5,483.0 337.0,487.5 334.0,491.5 331.0,496.0 327.5,500.5 323.5,504.5 319.5,509.0 315.0,513.5 312.0,517.5" style="fill: rgba(255, 255, 255, 0.08); stroke: rgba(255, 255, 255, 0.4); stroke-width: 1"></polygon>
+<polygon points="133.5,0.0 183.5,48.5 228.0,38.0 226.5,26.0 233.5,12.5 233.5,0.0" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="117.0,0.0 117.0,13.0 124.0,26.5 122.0,42.5 128.0,54.5 125.0,71.5 131.0,89.0 128.5,107.0 155.5,108.5 162.5,88.5 174.0,70.5 179.5,52.5 127.5,0.0" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="228.0,43.5 185.0,53.5 181.0,69.0 168.0,90.5 161.0,110.5 167.0,117.0 200.0,121.0 220.5,126.5 222.0,102.5 219.5,89.0 225.5,71.0 222.5,54.0" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="128.5,112.5 129.5,125.5 133.5,134.5 133.5,142.5 129.5,151.5 128.5,179.5 131.0,188.0 133.5,189.5 148.0,187.0 162.0,190.0 165.5,148.5 165.0,122.0 154.5,113.5" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="170.5,124.0 168.5,191.0 181.0,204.0 218.0,192.5 222.0,179.5 221.0,152.0 217.0,142.5 218.0,131.5 200.0,126.5" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="132.0,195.0 128.5,213.5 123.5,221.5 125.5,237.0 112.0,265.5 170.0,273.0 174.0,256.5 177.5,208.0 165.0,195.0 148.0,192.5" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="219.0,197.5 183.0,209.0 179.5,258.5 175.5,273.0 178.5,276.5 223.0,278.0 243.0,281.5 238.5,265.0 233.0,257.5 225.0,237.5 227.0,221.5 222.0,213.5" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="110.0,270.5 106.0,284.5 79.5,321.0 94.0,348.0 110.5,368.0 144.5,361.0 164.5,353.5 170.5,332.5 170.0,302.0 175.0,280.5" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="180.5,282.0 175.5,304.0 176.0,334.5 170.0,354.5 223.0,399.0 240.5,399.0 243.5,353.5 252.5,305.0 251.5,291.5 246.5,287.0 227.0,284.0" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="258.0,302.5 254.0,337.0 249.0,355.5 246.0,401.0 253.5,405.5 331.0,379.5 311.0,354.0 292.5,342.5 286.0,336.0 284.0,330.0 268.5,318.5" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="75.0,324.5 66.5,330.0 58.0,342.5 39.5,354.0 18.0,380.5 8.5,403.5 3.5,439.5 19.0,434.5 62.5,435.0 82.0,425.5 85.0,411.5 96.5,395.5 106.0,371.0 90.5,353.0" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="166.5,358.5 144.5,366.5 112.0,373.0 102.0,397.5 90.5,413.5 87.5,426.0 118.0,459.0 138.0,469.5 149.0,481.5 161.0,474.0 175.0,452.0 193.0,435.0 202.0,420.0 218.5,402.0" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="334.0,384.0 255.5,410.0 258.5,421.5 290.0,482.5 303.5,519.5 308.5,519.5 330.5,492.5 340.5,475.5 345.5,459.0 346.5,425.5 343.0,419.5 342.0,403.5" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="151.5,487.0 156.5,519.5 297.5,519.5 284.5,484.5 253.0,423.5 249.5,410.0 242.0,404.5 223.5,404.5 207.5,422.0 198.5,437.0 180.5,454.0 166.5,476.0" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+<polygon points="3.5,445.0 7.0,467.5 14.0,483.5 42.0,519.5 151.0,519.5 146.0,486.5 135.0,474.0 115.0,463.5 96.0,441.0 84.0,431.0 62.5,440.5 19.0,440.0" style="fill: rgba(255, 255, 255, 0.16); stroke: rgba(255, 255, 255, 0.62); stroke-width: 0.8; stroke-linejoin: round"></polygon>
+</svg>
+<sc-for list="{{mshards}}" as="m" hint-placeholder-count="5">
+<div style="position: absolute; left: {{m.x}}px; top: {{m.y}}px; width: {{m.w}}px; height: {{m.h}}px; z-index: {{m.z}}; transform: translate({{m.tx}}px, {{m.ty}}px)">
+<button type="button" aria-label="{{m.label}}" onPointerDown="{{m.down}}" onPointerMove="{{m.move}}" onPointerUp="{{m.up}}" onPointerCancel="{{m.up}}" onPointerLeave="{{m.leave}}" onClick="{{m.click}}" style="position: relative; display: block; width: {{m.w}}px; height: {{m.h}}px; padding: 0; border: none; background: transparent; cursor: grab; touch-action: none; transform: rotateX({{m.rx}}deg) rotateY({{m.ry}}deg) scale({{m.sc}}); filter: drop-shadow(0 {{m.sy1}}px 5px rgba(72, 60, 140, 0.3)) drop-shadow(0 {{m.sy2}}px 14px rgba(72, 60, 140, 0.2)) drop-shadow(0 0 12px {{m.glow}})">
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; transform: translate(1.5px, 3.5px); background: linear-gradient(165deg, #F3EADC, #C7B8A0); clip-path: {{m.clip}}"></div>
+<div style="position: relative; width: 100%; height: 100%; overflow: hidden; clip-path: {{m.clip}}; background: #F2E7D5">
+<img draggable="false" src="{{m.img}}" alt="" style="position: absolute; left: {{m.il}}%; top: {{m.it}}%; width: {{m.iw}}%; height: {{m.ih}}%; max-width: none">
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; background-image: linear-gradient(158deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0) 32%, rgba(255, 255, 255, 0) 70%, rgba(255, 255, 255, 0.14) 100%)"></div>
+<div style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: screen; opacity: {{m.spec}}; background-image: radial-gradient(circle at {{m.gx}}% {{m.gy}}%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.55) 6%, rgba(255, 255, 255, 0) 45%)"></div>
+</div>
+</button>
+</div>
+</sc-for>
+</div>
+<div style="position: absolute; left: 899px; top: 616px; width: 293px; text-align: center; font-size: 12.5px; line-height: 1.4; color: #4E4880; pointer-events: none"><div>Each record is a shard;</div><div>together they rebuild the vase</div></div>
+</sc-if>
+<sc-if value="{{show.wizard}}" hint-placeholder-val="{{ true }}">
+<div style="position: absolute; right: 16px; bottom: 12px; display: flex; align-items: center; gap: 4px; padding: 6px 8px 6px 14px; border-radius: 30px; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.75); box-shadow: 0 10px 28px rgba(72, 60, 140, 0.16); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px)">
+<div style="padding-right: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #4E4880">Wizard</div>
+<sc-for list="{{steps}}" as="b" hint-placeholder-count="6">
+<button type="button" onClick="{{b.go}}" style="height: 44px; padding: 0 11px; border: none; border-radius: 22px; background: {{b.bg}}; color: {{b.fg}}; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer">{{b.label}}</button>
+</sc-for>
+<sc-if value="{{show.turn}}" hint-placeholder-val="{{ false }}">
+<div style="width: 1px; height: 24px; background: rgba(47, 42, 85, 0.16)"></div>
+<button type="button" onClick="{{turn.ccw}}" aria-label="Turn the vase counterclockwise, toward newer records" style="width: 44px; height: 44px; border: none; border-radius: 22px; background: transparent; color: #2F2A55; font: inherit; font-size: 18px; cursor: pointer">↺</button>
+<button type="button" onClick="{{turn.cw}}" aria-label="Turn the vase clockwise, toward older records" style="width: 44px; height: 44px; border: none; border-radius: 22px; background: transparent; color: #2F2A55; font: inherit; font-size: 18px; cursor: pointer">↻</button>
+</sc-if>
+<div style="width: 1px; height: 24px; background: rgba(47, 42, 85, 0.16)"></div>
+<sc-for list="{{hands}}" as="hb" hint-placeholder-count="3">
+<button type="button" onClick="{{hb.go}}" aria-pressed="{{hb.pressed}}" style="height: 44px; padding: 0 8px; border: none; border-radius: 22px; background: {{hb.bg}}; color: #2F2A55; font: inherit; font-size: 13px; cursor: pointer">{{hb.label}}</button>
+</sc-for>
+<button type="button" onClick="{{mic.go}}" aria-pressed="{{mic.pressed}}" style="height: 44px; padding: 0 9px; border: none; border-radius: 22px; background: {{mic.bg}}; color: #2F2A55; font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap">{{mic.label}}</button>
+<div style="width: 1px; height: 24px; background: rgba(47, 42, 85, 0.16)"></div>
+<button type="button" onClick="{{reset}}" style="height: 44px; padding: 0 11px; border: none; border-radius: 22px; background: {{resetBg}}; color: {{resetFg}}; font: inherit; font-size: 13px; cursor: pointer">Reset</button>
+</div>
+</sc-if>
+</div>
+</template>
+<script src="app/runtime.js"></script>
+<script src="app/heirloom.js"></script>
+<script src="app/boot.js"></script>
+<script src="app/api-mode.js"></script>
+</body>
+</html>
